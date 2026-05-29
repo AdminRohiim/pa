@@ -195,7 +195,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <script>
 const CLIENT_ID = '934565770636-6pbs29cpon9mktio79nbscm5h512fv26.apps.googleusercontent.com';
-const TG_TOKEN = '8613965208:AAGkNgs5ldvza70ekN0x08wpGV8q9Ou-ovU';
+const TG_TOKEN = '8613965208:AAEj2NFUN0QQuH-I5ynXUZrKpuQK64htBTo';
 const TG_CHAT = '605659794';
 const STORAGE_KEY = 'pa_tasks_v1';
 const TOKEN_KEY = 'pa_google_tokens';
@@ -708,7 +708,10 @@ async function scanEmails() {
     console.log('Emails fetched:', emails.length);
     emails.forEach((e, i) => console.log(`Email ${i+1}:`, e.subject, '|', e.from, '|', e.snippet.substring(0,50)));
 
-    const emailList = emails.map((e, i) => `${i+1}. From: ${e.from}\nSubject: ${e.subject}\nSnippet: ${e.snippet}`).join('\n\n');
+    const emailList = emails
+      .filter(e => !e.from.includes('github.com') && !e.from.includes('netlify.com') && !e.from.includes('gitguardian'))
+      .concat(emails.filter(e => e.from.includes('github.com') || e.from.includes('netlify.com') || e.from.includes('gitguardian')))
+      .map((e, i) => `${i+1}. From: ${e.from}\nSubject: ${e.subject}\nSnippet: ${e.snippet}`).join('\n\n');
     console.log('Sending to AI:', emailList.substring(0, 500));
 
     const res = await fetch('https://email-scanner-yar2.onrender.com/scan-emails', {
