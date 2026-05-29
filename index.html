@@ -220,74 +220,30 @@ function isTokenExpired() {
 }
 
 async function getAccessToken() {
-  // Handle OAuth callback — check both query params and hash
-  const urlParams = new URLSearchParams(window.location.search);
+  // Handle implicit flow callback — token comes back in hash
   const hashParams = new URLSearchParams(window.location.hash.replace('#',''));
-  const code = urlParams.get('code') || hashParams.get('code');
+  const accessToken = hashParams.get('access_token');
+  const expiresIn = hashParams.get('expires_in');
 
-  if (code) {
-    await handleOAuthCallback(code);
+  if (accessToken) {
+    const tokens = { access_token: accessToken, expires_in: parseInt(expiresIn||'3600'), stored_at: Date.now() };
+    storeTokens(tokens);
+    hideConnectButton();
     window.history.replaceState({}, '', REDIRECT_URI);
+    return accessToken;
   }
 
   const tokens = getStoredTokens();
   if (!tokens) { showConnectButton(); throw new Error('Not connected'); }
-
   if (!isTokenExpired()) return tokens.access_token;
 
-  // Refresh using stored refresh token
-  if (tokens.refresh_token) {
-    try {
-      const res = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `client_id=${encodeURIComponent(CLIENT_ID)}&refresh_token=${encodeURIComponent(tokens.refresh_token)}&grant_type=refresh_token`
-      });
-      const data = await res.json();
-      if (data.access_token) {
-        const updated = { ...tokens, access_token: data.access_token, expires_in: data.expires_in, stored_at: Date.now() };
-        storeTokens(updated);
-        hideConnectButton();
-        return data.access_token;
-      }
-    } catch(e) {}
-  }
-
+  // Token expired — need to re-auth silently
   showConnectButton();
-  throw new Error('Token refresh failed — please reconnect');
+  throw new Error('Session expired — please reconnect');
 }
 
-async function handleOAuthCallback(code) {
-  const verifier = sessionStorage.getItem('pkce_verifier');
-  try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `code=${encodeURIComponent(code)}&client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&grant_type=authorization_code&code_verifier=${encodeURIComponent(verifier||'')}`
-    });
-    const data = await res.json();
-    if (data.access_token) {
-      storeTokens(data);
-      hideConnectButton();
-    } else {
-      console.error('OAuth error:', data);
-    }
-  } catch(e) { console.error('OAuth callback error:', e); }
-}
-
-// PKCE helpers
-function base64url(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-}
-
-async function startOAuth() {
-  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
-  sessionStorage.setItem('pkce_verifier', verifier);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  const challenge = base64url(digest);
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(SCOPES)}&access_type=offline&prompt=consent&code_challenge=${challenge}&code_challenge_method=S256`;
+function startOAuth() {
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${encodeURIComponent(SCOPES)}&prompt=consent`;
   window.location.href = url;
 }
 
