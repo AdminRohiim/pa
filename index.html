@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Assistant — Mohammad</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; padding: 20px; color: #1a1a1a; }
+.dash { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; margin: 0 auto; }
+.card { background: white; border: 0.5px solid #e5e3db; border-radius: 14px; padding: 1.25rem; }
+.card-full { grid-column: 1 / -1; }
+.section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #999; margin-bottom: 12px; }
+.meeting-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0ede5; }
+.meeting-item:last-child { border-bottom: none; padding-bottom: 0; }
+.meeting-time { font-size: 12px; color: #777; min-width: 60px; padding-top: 2px; }
+.meeting-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: #1D9E75; }
+.meeting-title { font-size: 14px; font-weight: 500; }
+.meeting-meta { font-size: 12px; color: #888; margin-top: 2px; }
+.badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; }
+.badge-google { background: #E1F5EE; color: #0F6E56; }
+.badge-soon { background: #FAEEDA; color: #854F0B; margin-left: 6px; }
+.task-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 0.5px solid #f0ede5; }
+.task-item:last-child { border-bottom: none; padding-bottom: 0; }
+.task-check { width: 16px; height: 16px; border: 1.5px solid #ccc; border-radius: 4px; margin-top: 2px; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+.task-check.done { background: #1D9E75; border-color: #1D9E75; color: white; }
+.task-text { font-size: 14px; line-height: 1.4; }
+.task-text.done { text-decoration: line-through; color: #aaa; }
+.p-badge { font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 20px; margin-left: 6px; }
+.p1 { background: #FCEBEB; color: #A32D2D; }
+.p2 { background: #FAEEDA; color: #854F0B; }
+.p3 { background: #E1F5EE; color: #0F6E56; }
+.p4 { background: #F1EFE8; color: #5F5E5A; }
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat { background: #f5f4f0; border-radius: 10px; padding: 12px; text-align: center; }
+.stat-num { font-size: 24px; font-weight: 600; }
+.stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+.greeting { font-size: 20px; font-weight: 600; margin-bottom: 2px; }
+.subtext { font-size: 13px; color: #888; margin-bottom: 16px; }
+.next-pill { display: inline-flex; align-items: center; gap: 6px; background: #FAEEDA; color: #854F0B; border-radius: 20px; font-size: 12px; font-weight: 500; padding: 5px 14px; }
+.filter-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-btn { font-size: 12px; padding: 3px 12px; border-radius: 20px; border: 1px solid #e0ddd5; background: transparent; color: #777; cursor: pointer; }
+.filter-btn.active { background: #f0ede5; color: #1a1a1a; border-color: #ccc; }
+.action-btn { font-size: 13px; padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer; margin-top: 8px; width: 100%; font-weight: 500; transition: opacity 0.2s; }
+.action-btn:hover { opacity: 0.85; }
+.btn-tg { background: #229ED9; color: white; }
+.btn-ghost { background: #f5f4f0; border: 1px solid #e0ddd5; color: #555; }
+.btn-add { background: #1a1a1a; color: white; margin-top: 12px; }
+.progress-bar { height: 5px; background: #f0ede5; border-radius: 3px; margin-top: 12px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; background: #378ADD; transition: width 0.4s; }
+.loading { font-size: 13px; color: #aaa; padding: 20px 0; text-align: center; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: #1D9E75; display: inline-block; margin-right: 5px; animation: pulse 2s infinite; }
+.tg-log { font-size: 12px; color: #555; margin-top: 8px; padding: 6px 10px; background: #f5f4f0; border-radius: 8px; display: none; text-align: center; }
+.tg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tg-card { background: #f5f4f0; border-radius: 10px; padding: 12px; }
+.tg-card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.tg-card-desc { font-size: 12px; color: #777; line-height: 1.4; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: white; border-radius: 16px; padding: 1.5rem; width: 360px; max-width: 95vw; }
+.modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+.modal label { font-size: 12px; font-weight: 500; color: #666; display: block; margin-bottom: 4px; margin-top: 12px; }
+.modal input, .modal select { width: 100%; padding: 8px 10px; border: 1px solid #e0ddd5; border-radius: 8px; font-size: 14px; outline: none; }
+.modal input:focus, .modal select:focus { border-color: #1a1a1a; }
+.modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+.modal-btns button { flex: 1; padding: 9px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-save { background: #1a1a1a; color: white; }
+.btn-cancel { background: #f5f4f0; color: #555; }
+.task-actions { display: flex; gap: 4px; margin-left: auto; flex-shrink: 0; }
+.task-action-btn { background: none; border: none; cursor: pointer; font-size: 13px; opacity: 0.35; padding: 2px 4px; transition: opacity 0.15s; }
+.task-action-btn:hover { opacity: 1; }
+.btn-gmail { background: #EA4335; color: white; }
+.suggestion-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid #f0ede5; }
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-info { flex: 1; min-width: 0; }
+.suggestion-title { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+.suggestion-meta { font-size: 11px; color: #999; margin-top: 2px; }
+.suggestion-add { background: #1a1a1a; color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: 500; padding: 4px 10px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.suggestion-add:hover { background: #333; }
+.suggestion-dismiss { background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; padding: 0 4px; flex-shrink: 0; }
+.suggestion-dismiss:hover { color: #999; }
+.scan-status { font-size: 12px; color: #aaa; text-align: center; padding: 12px 0; }
+.mem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.mem-stat { background: #f5f4f0; border-radius: 10px; padding: 12px; text-align: center; }
+.mem-stat-num { font-size: 22px; font-weight: 600; color: #1a1a1a; }
+.mem-stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+.insight-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid #f0ede5; font-size: 13px; color: #444; }
+.insight-item:last-child { border-bottom: none; }
+.insight-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.nudge-item { background: #FAEEDA; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 13px; color: #854F0B; display: flex; align-items: center; gap: 8px; }
+.nudge-item:last-child { margin-bottom: 0; }
+.btn-review { background: #5856D6; color: white; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@media (max-width: 600px) { .dash { grid-template-columns: 1fr; } .tg-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="connect-banner" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:white;padding:12px 20px;border-radius:12px;align-items:center;gap:12px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.2);">
+  <span style="font-size:13px;">📅 Connect Google to load your calendar</span>
+  <button onclick="startOAuth()" style="background:#4285F4;color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;">Connect Google</button>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Add Task</h3>
+    <label>Task name</label>
+    <input type="text" id="task-input" placeholder="What needs to be done?" />
+    <label>Priority</label>
+    <select id="task-priority">
+      <option value="p1">🔴 P1 — Urgent & Important</option>
+      <option value="p2">🟡 P2 — Important, not urgent</option>
+      <option value="p3" selected>🟢 P3 — Nice to do</option>
+      <option value="p4">⚪ P4 — Backlog</option>
+    </select>
+    <label>Due date</label>
+    <input type="text" id="task-due" placeholder="e.g. Today, This week, No deadline" />
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="dash">
+
+  <div class="card card-full">
+    <div class="greeting" id="greeting">Hello, Mohammad 👋</div>
+    <div class="subtext" id="datestr"></div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-num" id="meet-count">—</div><div class="stat-lbl">meetings today</div></div>
+      <div class="stat"><div class="stat-num" id="task-count">0</div><div class="stat-lbl">open tasks</div></div>
+      <div class="stat"><div class="stat-num" id="p1-count">0</div><div class="stat-lbl">urgent (P1)</div></div>
+    </div>
+    <span class="next-pill">⏳ <span id="next-text">Loading calendar...</span></span>
+  </div>
+
+  <div class="card">
+    <div class="section-label"><span class="live-dot"></span>Today's Schedule</div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="filterCal('all',this)">All</button>
+      <button class="filter-btn" onclick="filterCal('google',this)">Google</button>
+    </div>
+    <div id="cal-list"><div class="loading">Fetching your calendar...</div></div>
+    <button class="action-btn btn-tg" onclick="sendBriefing()">📬 Send today's briefing to Telegram</button>
+    <button class="action-btn btn-ghost" onclick="sendTodaySchedule()">📅 Send schedule now</button>
+    <div class="tg-log" id="tg-log"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Tasks</div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="filterTasks('all',this)">All</button>
+      <button class="filter-btn" onclick="filterTasks('p1',this)">🔴 P1</button>
+      <button class="filter-btn" onclick="filterTasks('p2',this)">🟡 P2</button>
+      <button class="filter-btn" onclick="filterTasks('p3',this)">🟢 P3</button>
+    </div>
+    <div id="task-list"><div class="loading" style="padding:12px 0">No tasks yet — add one below!</div></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
+    <div style="font-size:12px;color:#aaa;margin-top:6px;" id="prog-lbl">0 of 0 done</div>
+    <button class="action-btn btn-add" onclick="openModal()">+ Add task</button>
+  </div>
+
+  <div class="card card-full">
+    <div class="section-label">📧 AI Email Scanner</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+      <div style="font-size:13px;color:#666;">Scans your Gmail for action items and suggests them as tasks</div>
+      <button class="action-btn btn-gmail" style="width:auto;margin:0;padding:7px 16px;" onclick="scanEmails()">🔍 Scan emails</button>
+    </div>
+    <div id="scan-results"><div class="scan-status">Click "Scan emails" to detect action items from your inbox</div></div>
+  </div>
+
+  <div class="card card-full">
+    <div class="section-label">🧠 Memory & Insights</div>
+    <div class="mem-grid">
+      <div class="mem-stat"><div class="mem-stat-num" id="mem-done">0</div><div class="mem-stat-lbl">tasks completed</div></div>
+      <div class="mem-stat"><div class="mem-stat-num" id="mem-deferred">0</div><div class="mem-stat-lbl">tasks deferred</div></div>
+      <div class="mem-stat"><div class="mem-stat-num" id="mem-rate">0%</div><div class="mem-stat-lbl">completion rate</div></div>
+    </div>
+    <div id="nudge-list"></div>
+    <div id="insight-list"></div>
+    <button class="action-btn btn-review" style="margin-top:12px;" onclick="sendWeeklyReview()">📊 Send weekly review to Telegram</button>
+  </div>
+
+  <div class="card card-full" id="tg-section">
+    <div class="section-label">🤖 Telegram Bot — @PA_Rohiim_bot</div>
+    <div class="tg-grid">
+      <div class="tg-card"><div class="tg-card-title">🌅 Daily Briefing</div><div class="tg-card-desc">Tap "Send briefing" to get your full day summary — meetings + urgent tasks — straight to Telegram</div></div>
+      <div class="tg-card"><div class="tg-card-title">⏰ Meeting Reminders</div><div class="tg-card-desc">Auto-reminds you 15 min before every meeting while this dashboard is open in your browser</div></div>
+      <div class="tg-card"><div class="tg-card-title">📅 On-demand Schedule</div><div class="tg-card-desc">Tap "Send schedule now" anytime to get today's events sent to your phone instantly</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CLIENT_ID = '934565770636-6pbs29cpon9mktio79nbscm5h512fv26.apps.googleusercontent.com';
+const TG_TOKEN = '8613965208:AAGkNgs5ldvza70ekN0x08wpGV8q9Ou-ovU';
+const TG_CHAT = '605659794';
+const STORAGE_KEY = 'pa_tasks_v1';
+const TOKEN_KEY = 'pa_google_tokens';
+const MEM_KEY = 'pa_memory_v1';
+const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly';
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+// ── OAUTH TOKEN MANAGEMENT ──
+function getStoredTokens() {
+  try { return JSON.parse(localStorage.getItem(TOKEN_KEY)) || null; } catch { return null; }
+}
+
+function storeTokens(tokens) {
+  tokens.stored_at = Date.now();
+  localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
+}
+
+function isTokenExpired() {
+  const t = getStoredTokens();
+  if (!t || !t.stored_at || !t.expires_in) return true;
+  return (Date.now() - t.stored_at) > (t.expires_in - 120) * 1000;
+}
+
+async function getAccessToken() {
+  // Handle OAuth callback — check both query params and hash
+  const urlParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace('#',''));
+  const code = urlParams.get('code') || hashParams.get('code');
+
+  if (code) {
+    await handleOAuthCallback(code);
+    window.history.replaceState({}, '', REDIRECT_URI);
+  }
+
+  const tokens = getStoredTokens();
+  if (!tokens) { showConnectButton(); throw new Error('Not connected'); }
+
+  if (!isTokenExpired()) return tokens.access_token;
+
+  // Refresh using stored refresh token
+  if (tokens.refresh_token) {
+    try {
+      const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `client_id=${encodeURIComponent(CLIENT_ID)}&refresh_token=${encodeURIComponent(tokens.refresh_token)}&grant_type=refresh_token`
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        const updated = { ...tokens, access_token: data.access_token, expires_in: data.expires_in, stored_at: Date.now() };
+        storeTokens(updated);
+        hideConnectButton();
+        return data.access_token;
+      }
+    } catch(e) {}
+  }
+
+  showConnectButton();
+  throw new Error('Token refresh failed — please reconnect');
+}
+
+async function handleOAuthCallback(code) {
+  const verifier = sessionStorage.getItem('pkce_verifier');
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `code=${encodeURIComponent(code)}&client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&grant_type=authorization_code&code_verifier=${encodeURIComponent(verifier||'')}`
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      storeTokens(data);
+      hideConnectButton();
+    } else {
+      console.error('OAuth error:', data);
+    }
+  } catch(e) { console.error('OAuth callback error:', e); }
+}
+
+// PKCE helpers
+function base64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function startOAuth() {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  sessionStorage.setItem('pkce_verifier', verifier);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const challenge = base64url(digest);
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(SCOPES)}&access_type=offline&prompt=consent&code_challenge=${challenge}&code_challenge_method=S256`;
+  window.location.href = url;
+}
+
+function showConnectButton() {
+  document.getElementById('connect-banner').style.display = 'flex';
+}
+
+function hideConnectButton() {
+  document.getElementById('connect-banner').style.display = 'none';
+}
+
+let allEvents = [];
+let remindedEvents = new Set();
+let tasks = [];
+let editingId = null;
+let currentFilter = 'all';
+
+// ── GREETING using local browser time ──
+(function() {
+  const now = new Date();
+  const h = now.getHours();
+  const greeting = h >= 5 && h < 12 ? 'Good morning' :
+                   h >= 12 && h < 17 ? 'Good afternoon' :
+                   h >= 17 && h < 21 ? 'Good evening' : 'Good night';
+  document.getElementById('greeting').textContent = `${greeting}, Mohammad 👋`;
+  document.getElementById('datestr').textContent = now.toLocaleDateString('en-SG', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+})();
+
+// ── TASK STORAGE ──
+function loadTasks() {
+  try { tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { tasks = []; }
+  renderTasks();
+}
+
+function saveTasks() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+}
+
+function renderTasks() {
+  const list = document.getElementById('task-list');
+  const filtered = currentFilter === 'all' ? tasks : tasks.filter(t => t.priority === currentFilter);
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="loading" style="padding:12px 0">${tasks.length === 0 ? 'No tasks yet — add one below!' : 'No tasks in this priority.'}</div>`;
+  } else {
+    list.innerHTML = filtered.map(t => `
+      <div class="task-item" data-id="${t.id}" data-p="${t.priority}">
+        <div class="task-check${t.done ? ' done' : ''}" onclick="toggleTask('${t.id}')">${t.done ? '✓' : ''}</div>
+        <div style="flex:1;min-width:0">
+          <div class="task-text${t.done ? ' done' : ''}">${escHtml(t.name)} <span class="p-badge ${t.priority}">${t.priority.toUpperCase()}</span></div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px">${escHtml(t.due || 'No deadline')}</div>
+        </div>
+        <div class="task-actions">
+          <button class="task-action-btn" onclick="openEditModal('${t.id}')" title="Edit">✏️</button>
+          <button class="task-action-btn" onclick="deleteTask('${t.id}')" title="Delete">🗑️</button>
+        </div>
+      </div>`).join('');
+  }
+  updateStats();
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateStats() {
+  const open = tasks.filter(t => !t.done).length;
+  const p1 = tasks.filter(t => !t.done && t.priority === 'p1').length;
+  const total = tasks.length;
+  const doneCount = tasks.filter(t => t.done).length;
+  document.getElementById('task-count').textContent = open;
+  document.getElementById('p1-count').textContent = p1;
+  document.getElementById('progress').style.width = total > 0 ? Math.round((doneCount / total) * 100) + '%' : '0%';
+  document.getElementById('prog-lbl').textContent = `${doneCount} of ${total} done`;
+}
+
+function toggleTask(id) {
+  const t = tasks.find(t => t.id === id);
+  if (t) { t.done = !t.done; saveTasks(); renderTasks(); }
+}
+
+function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  tasks = tasks.filter(t => t.id !== id);
+  saveTasks(); renderTasks();
+}
+
+// ── MODAL ──
+function openModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Add Task';
+  document.getElementById('task-input').value = '';
+  document.getElementById('task-priority').value = 'p3';
+  document.getElementById('task-due').value = '';
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('task-input').focus(), 50);
+}
+
+function openEditModal(id) {
+  const t = tasks.find(t => t.id === id);
+  if (!t) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = 'Edit Task';
+  document.getElementById('task-input').value = t.name;
+  document.getElementById('task-priority').value = t.priority;
+  document.getElementById('task-due').value = t.due || '';
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('task-input').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  editingId = null;
+}
+
+function saveTask() {
+  const name = document.getElementById('task-input').value.trim();
+  if (!name) { document.getElementById('task-input').style.borderColor = '#e55'; document.getElementById('task-input').focus(); return; }
+  document.getElementById('task-input').style.borderColor = '';
+  const priority = document.getElementById('task-priority').value;
+  const due = document.getElementById('task-due').value.trim() || 'No deadline';
+  if (editingId) {
+    const t = tasks.find(t => t.id === editingId);
+    if (t) { t.name = name; t.priority = priority; t.due = due; }
+  } else {
+    tasks.push({ id: Date.now().toString(), name, priority, due, done: false });
+  }
+  saveTasks(); renderTasks(); closeModal();
+}
+
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('task-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveTask(); });
+
+function filterTasks(type, btn) {
+  document.querySelectorAll('.filter-row')[1].querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = type;
+  renderTasks();
+}
+
+// ── CALENDAR ──
+
+function formatTime(dateStr) {
+  if (!dateStr) return 'All day';
+  return new Date(dateStr).toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function minutesUntil(dateStr) {
+  if (!dateStr) return null;
+  return Math.round((new Date(dateStr) - new Date()) / 60000);
+}
+
+async function sendTelegram(msg) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TG_CHAT, text: msg, parse_mode: 'HTML' })
+    });
+    const data = await res.json();
+    showLog(data.ok ? '✅ Sent to Telegram!' : '❌ ' + data.description);
+  } catch(e) { showLog('❌ Failed: ' + e.message); }
+}
+
+function showLog(msg) {
+  const el = document.getElementById('tg-log');
+  el.style.display = 'block';
+  el.textContent = msg;
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+async function sendBriefing() {
+  const now = new Date();
+  const h = now.getHours();
+  const timeGreeting = h >= 5 && h < 12 ? 'Good morning' : h >= 12 && h < 17 ? 'Good afternoon' : 'Good evening';
+  const dateStr = now.toLocaleDateString('en-SG', { weekday:'long', day:'numeric', month:'long' });
+  const p1Tasks = tasks.filter(t => !t.done && t.priority === 'p1').map(t => `• ${t.name}`).join('\n');
+  const eventLines = allEvents.length > 0
+    ? allEvents.map(e => `• ${formatTime(e.start?.dateTime || e.start?.date)} — ${e.summary || 'Untitled'}`).join('\n')
+    : '• No meetings today 🎉';
+  await sendTelegram(`${timeGreeting === 'Good morning' ? '🌅' : timeGreeting === 'Good afternoon' ? '☀️' : '🌙'} <b>${timeGreeting}, Mohammad!</b>\n📅 ${dateStr}\n\n<b>Today's meetings:</b>\n${eventLines}\n\n<b>🔴 Urgent tasks (P1):</b>\n${p1Tasks || '• All clear!'}\n\n<i>Stay focused. You've got this! 💪</i>`);
+}
+
+async function sendTodaySchedule() {
+  const eventLines = allEvents.length > 0
+    ? allEvents.map(e => `• ${formatTime(e.start?.dateTime || e.start?.date)} — ${e.summary || 'Untitled'}`).join('\n')
+    : 'No meetings today 🎉';
+  await sendTelegram(`📅 <b>Today's schedule:</b>\n${eventLines}`);
+}
+
+async function loadCalendar() {
+  try {
+    const token = await getAccessToken();
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(23,59,59,999);
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${start.toISOString()}&timeMax=${end.toISOString()}&singleEvents=true&orderBy=startTime`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    allEvents = data.items || [];
+    document.getElementById('meet-count').textContent = allEvents.length;
+    let nextEvent = null, minMins = Infinity;
+    allEvents.forEach(e => {
+      const mins = minutesUntil(e.start?.dateTime);
+      if (mins !== null && mins > 0 && mins < minMins) { minMins = mins; nextEvent = e; }
+    });
+    document.getElementById('next-text').textContent = nextEvent
+      ? `Next: ${nextEvent.summary} in ${minMins} min`
+      : allEvents.length > 0 ? 'No upcoming meetings' : 'No events today — enjoy! 🎉';
+    const calList = document.getElementById('cal-list');
+    calList.innerHTML = allEvents.length === 0
+      ? '<div class="loading">No events today</div>'
+      : allEvents.map(e => {
+          const time = formatTime(e.start?.dateTime || e.start?.date);
+          const mins = minutesUntil(e.start?.dateTime);
+          const soonBadge = (mins !== null && mins > 0 && mins <= 30) ? `<span class="badge badge-soon">in ${mins} min</span>` : '';
+          return `<div class="meeting-item" data-src="google">
+            <span class="meeting-time">${time}</span>
+            <span class="meeting-dot"></span>
+            <div style="flex:1">
+              <div class="meeting-title">${e.summary || 'Untitled'} ${soonBadge}</div>
+              <div class="meeting-meta"><span class="badge badge-google">Google</span>${e.location ? ' · ' + e.location.substring(0,25) : ''}</div>
+            </div>
+          </div>`;
+        }).join('');
+  } catch(err) {
+    document.getElementById('cal-list').innerHTML = `<div style="font-size:12px;color:#e55;padding:8px;">Could not load calendar: ${err.message}</div>`;
+    document.getElementById('meet-count').textContent = '—';
+    document.getElementById('next-text').textContent = 'Calendar unavailable';
+  }
+}
+
+function filterCal(type, btn) {
+  document.querySelectorAll('.filter-row')[0].querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#cal-list .meeting-item').forEach(item => {
+    item.style.display = (type === 'all' || item.dataset.src === type) ? '' : 'none';
+  });
+}
+
+function checkReminders() {
+  allEvents.forEach(e => {
+    if (!e.start?.dateTime) return;
+    const mins = minutesUntil(e.start.dateTime);
+    if (mins !== null && mins <= 15 && mins > 13 && !remindedEvents.has(e.id)) {
+      remindedEvents.add(e.id);
+      sendTelegram(`⏰ <b>Meeting in 15 minutes!</b>\n📌 ${e.summary || 'Untitled'}\n🕐 ${formatTime(e.start.dateTime)}${e.location ? '\n📍 ' + e.location : ''}`);
+    }
+  });
+}
+
+loadTasks();
+loadCalendar();
+initMemory();
+setInterval(checkReminders, 60000);
+setInterval(loadCalendar, 300000);
+setInterval(checkWeeklyReview, 60000 * 30); // check every 30 min
+
+// ── MEMORY SYSTEM ──
+
+function loadMemory() {
+  try { return JSON.parse(localStorage.getItem(MEM_KEY)) || defaultMemory(); } catch { return defaultMemory(); }
+}
+
+function defaultMemory() {
+  return { completedTasks: [], deferredTasks: {}, hourCounts: {}, dayCounts: {}, weeklyReviewSent: null };
+}
+
+function saveMemory(mem) {
+  localStorage.setItem(MEM_KEY, JSON.stringify(mem));
+}
+
+function recordTaskComplete(task) {
+  const mem = loadMemory();
+  const now = new Date();
+  mem.completedTasks.push({ name: task.name, priority: task.priority, completedAt: now.toISOString(), hour: now.getHours(), day: now.getDay() });
+  // track productive hours and days
+  const h = String(now.getHours());
+  const d = String(now.getDay());
+  mem.hourCounts[h] = (mem.hourCounts[h] || 0) + 1;
+  mem.dayCounts[d] = (mem.dayCounts[d] || 0) + 1;
+  // keep last 90 days only
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+  mem.completedTasks = mem.completedTasks.filter(t => new Date(t.completedAt) > cutoff);
+  saveMemory(mem);
+  renderMemory();
+}
+
+function recordTaskDeferred(task) {
+  const mem = loadMemory();
+  mem.deferredTasks[task.id] = (mem.deferredTasks[task.id] || 0) + 1;
+  saveMemory(mem);
+  renderMemory();
+}
+
+function initMemory() {
+  // Count already-completed tasks into memory on first load
+  const mem = loadMemory();
+  const now = new Date();
+  tasks.filter(t => t.done).forEach(t => {
+    if (!mem.completedTasks.find(c => c.name === t.name)) {
+      mem.completedTasks.push({ name: t.name, priority: t.priority, completedAt: now.toISOString(), hour: now.getHours(), day: now.getDay() });
+    }
+  });
+  saveMemory(mem);
+  renderMemory();
+}
+
+function renderMemory() {
+  const mem = loadMemory();
+  const now = new Date();
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+
+  // This week stats
+  const weekDone = mem.completedTasks.filter(t => new Date(t.completedAt) > weekAgo);
+  const openCount = tasks.filter(t => !t.done).length;
+  const totalEver = mem.completedTasks.length + openCount;
+  const rate = totalEver > 0 ? Math.round((mem.completedTasks.length / totalEver) * 100) : 0;
+
+  // Deferred count this week
+  const deferredCount = Object.values(mem.deferredTasks).filter(v => v > 0).length;
+
+  document.getElementById('mem-done').textContent = weekDone.length;
+  document.getElementById('mem-deferred').textContent = deferredCount;
+  document.getElementById('mem-rate').textContent = rate + '%';
+
+  // Nudges — tasks deferred 2+ times
+  const nudgeList = document.getElementById('nudge-list');
+  const nudges = tasks.filter(t => !t.done && (mem.deferredTasks[t.id] || 0) >= 2);
+  nudgeList.innerHTML = nudges.length > 0
+    ? nudges.map(t => `<div class="nudge-item">⚠️ <span>You've deferred "<b>${escHtml(t.name)}</b>" ${mem.deferredTasks[t.id]} times — time to tackle it?</span></div>`).join('')
+    : '';
+
+  // Insights
+  const insightList = document.getElementById('insight-list');
+  const insights = [];
+
+  // Peak hour
+  const peakHour = Object.entries(mem.hourCounts).sort((a,b) => b[1]-a[1])[0];
+  if (peakHour) {
+    const h = parseInt(peakHour[0]);
+    const label = h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h-12}pm`;
+    insights.push({ icon: '⚡', text: `Your most productive hour is <b>${label}</b> — that's when you complete the most tasks` });
+  }
+
+  // Peak day
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const peakDay = Object.entries(mem.dayCounts).sort((a,b) => b[1]-a[1])[0];
+  if (peakDay) insights.push({ icon: '📅', text: `You get the most done on <b>${days[parseInt(peakDay[0])]}</b>` });
+
+  // P1 completion
+  const p1Done = weekDone.filter(t => t.priority === 'p1').length;
+  const p1Total = tasks.filter(t => t.priority === 'p1').length + p1Done;
+  if (p1Total > 0) insights.push({ icon: '🔴', text: `You completed <b>${p1Done} of ${p1Total}</b> urgent (P1) tasks this week` });
+
+  // Working style
+  const morningDone = mem.completedTasks.filter(t => t.hour >= 6 && t.hour < 12).length;
+  const afternoonDone = mem.completedTasks.filter(t => t.hour >= 12 && t.hour < 18).length;
+  if (morningDone + afternoonDone > 5) {
+    const style = morningDone > afternoonDone ? 'morning person 🌅' : 'afternoon person ☀️';
+    insights.push({ icon: '🧠', text: `Working style: You're a <b>${style}</b> — most tasks completed ${morningDone > afternoonDone ? 'before noon' : 'in the afternoon'}` });
+  }
+
+  if (insights.length === 0) {
+    insightList.innerHTML = '<div style="font-size:12px;color:#aaa;padding:8px 0">Insights will appear as you use the dashboard more 📈</div>';
+  } else {
+    insightList.innerHTML = insights.map(i => `<div class="insight-item"><span class="insight-icon">${i.icon}</span><span>${i.text}</span></div>`).join('');
+  }
+}
+
+// Override toggleTask to record memory
+const _origToggleTask = toggleTask;
+toggleTask = function(id) {
+  const t = tasks.find(t => t.id === id);
+  const wasDone = t ? t.done : false;
+  _origToggleTask(id);
+  const tAfter = tasks.find(t => t.id === id);
+  if (tAfter && tAfter.done && !wasDone) recordTaskComplete(tAfter);
+  if (tAfter && !tAfter.done && wasDone) recordTaskDeferred(tAfter);
+};
+
+async function sendWeeklyReview() {
+  const mem = loadMemory();
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekDone = mem.completedTasks.filter(t => new Date(t.completedAt) > weekAgo);
+  const deferredNudges = tasks.filter(t => !t.done && (mem.deferredTasks[t.id] || 0) >= 2);
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const peakDay = Object.entries(mem.dayCounts).sort((a,b) => b[1]-a[1])[0];
+  const peakHour = Object.entries(mem.hourCounts).sort((a,b) => b[1]-a[1])[0];
+  const peakHourLabel = peakHour ? (parseInt(peakHour[0]) < 12 ? `${peakHour[0]}am` : `${parseInt(peakHour[0])-12}pm`) : '—';
+
+  const completedLines = weekDone.length > 0
+    ? weekDone.slice(-10).map(t => `✅ ${t.name}`).join('\n')
+    : '• Nothing completed yet this week';
+
+  const deferredLines = deferredNudges.length > 0
+    ? deferredNudges.map(t => `⚠️ ${t.name} (deferred ${mem.deferredTasks[t.id]}x)`).join('\n')
+    : '• No recurring deferrals — great job!';
+
+  const msg = `📊 <b>Weekly Review — Mohammad</b>\n` +
+    `📅 Week ending ${new Date().toLocaleDateString('en-SG', {day:'numeric',month:'long'})}\n\n` +
+    `<b>✅ Completed this week (${weekDone.length} tasks):</b>\n${completedLines}\n\n` +
+    `<b>⚠️ Tasks you keep deferring:</b>\n${deferredLines}\n\n` +
+    `<b>📈 Your patterns:</b>\n` +
+    `• Most productive day: ${peakDay ? days[parseInt(peakDay[0])] : '—'}\n` +
+    `• Peak hour: ${peakHourLabel}\n` +
+    `• Completion rate: ${document.getElementById('mem-rate').textContent}\n\n` +
+    `<i>Keep going, Mohammad! 💪 Review your deferred tasks first thing next week.</i>`;
+
+  await sendTelegram(msg);
+  mem.weeklyReviewSent = new Date().toISOString();
+  saveMemory(mem);
+}
+
+function checkWeeklyReview() {
+  const now = new Date();
+  if (now.getDay() !== 0) return; // Sunday only
+  if (now.getHours() !== 20) return; // 8pm only
+  const mem = loadMemory();
+  if (mem.weeklyReviewSent) {
+    const last = new Date(mem.weeklyReviewSent);
+    const daysSince = (now - last) / (1000 * 60 * 60 * 24);
+    if (daysSince < 6) return; // don't resend within same week
+  }
+  sendWeeklyReview();
+}
+
+// ── GMAIL AI SCANNER ──
+async function getGmailToken() {
+  return await getAccessToken();
+}
+
+async function fetchRecentEmails() {
+  const token = await getGmailToken();
+  const res = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=newer_than:7d+-category:promotions+-category:social', {
+    headers: { Authorization: 'Bearer ' + token }
+  });
+  const data = await res.json();
+  if (!data.messages) return [];
+  const emails = await Promise.all(data.messages.slice(0, 15).map(async m => {
+    const r = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const msg = await r.json();
+    const subject = msg.payload?.headers?.find(h => h.name === 'Subject')?.value || '(no subject)';
+    const from = msg.payload?.headers?.find(h => h.name === 'From')?.value || '';
+    const snippet = msg.snippet || '';
+    return { subject, from, snippet };
+  }));
+  return emails;
+}
+
+async function scanEmails() {
+  const el = document.getElementById('scan-results');
+  el.innerHTML = '<div class="scan-status">🔍 Scanning emails with AI...</div>';
+  try {
+    const emails = await fetchRecentEmails();
+    if (!emails.length) { el.innerHTML = '<div class="scan-status">No recent emails found.</div>'; return; }
+
+    // Show debug info
+    console.log('Emails fetched:', emails.length);
+    emails.forEach((e, i) => console.log(`Email ${i+1}:`, e.subject, '|', e.from, '|', e.snippet.substring(0,50)));
+
+    const emailList = emails.map((e, i) => `${i+1}. From: ${e.from}\nSubject: ${e.subject}\nSnippet: ${e.snippet}`).join('\n\n');
+    console.log('Sending to AI:', emailList.substring(0, 500));
+
+    const res = await fetch('/.netlify/functions/scan-emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailList })
+    });
+
+    const result = await res.json();
+    console.log('API result:', JSON.stringify(result));
+    const suggestions = result.suggestions || [];
+
+    if (!suggestions.length) {
+      el.innerHTML = '<div class="scan-status">✅ No action items found in your recent emails — inbox looking good!</div>';
+      return;
+    }
+
+    el.innerHTML = suggestions.map((s, i) => `
+      <div class="suggestion-item" id="sug-${i}">
+        <div class="suggestion-info">
+          <div class="suggestion-title">${escHtml(s.task)}</div>
+          <div class="suggestion-meta">From: ${escHtml(s.from || '—')} &nbsp;·&nbsp; <span class="p-badge ${s.priority}">${(s.priority||'p2').toUpperCase()}</span> &nbsp;·&nbsp; ${escHtml(s.due || 'No deadline')}</div>
+        </div>
+        <button class="suggestion-add" onclick="addSuggestion(${i}, ${JSON.stringify(s).replace(/"/g,'&quot;')})">+ Add task</button>
+        <button class="suggestion-dismiss" onclick="document.getElementById('sug-${i}').remove()" title="Dismiss">×</button>
+      </div>`).join('');
+  } catch(err) {
+    el.innerHTML = `<div class="scan-status" style="color:#e55;">❌ Scan failed: ${err.message}</div>`;
+  }
+}
+
+function addSuggestion(i, s) {
+  tasks.push({ id: Date.now().toString(), name: s.task, priority: s.priority || 'p2', due: s.due || 'No deadline', done: false });
+  saveTasks(); renderTasks();
+  const el = document.getElementById('sug-' + i);
+  if (el) { el.style.opacity = '0.4'; el.querySelector('.suggestion-add').textContent = '✓ Added'; el.querySelector('.suggestion-add').disabled = true; }
+}
+</script>
+</body>
+</html>
