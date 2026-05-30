@@ -699,24 +699,60 @@ async function fetchRecentEmails() {
 
 async function scanEmails() {
   const el = document.getElementById('scan-results');
-  el.innerHTML = '<div class="scan-status">🔍 Scanning emails with AI...</div>';
+  el.innerHTML = '<div class="scan-status">🔍 Scanning emails...</div>';
   try {
     const emails = await fetchRecentEmails();
     if (!emails.length) { el.innerHTML = '<div class="scan-status">No recent emails found.</div>'; return; }
 
-    // Show debug info
     console.log('Emails fetched:', emails.length);
-    emails.forEach((e, i) => console.log(`Email ${i+1}:`, e.subject, '|', e.from, '|', e.snippet.substring(0,50)));
 
-    const res = await fetch('https://email-scanner-yar2.onrender.com/scan-emails', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emails })
+    // Task keywords to detect
+    const taskKeywords = ['submit', 'submission', 'please', 'could you', 'can you', 'need you', 'reminder', 'due', 'by tomorrow', 'by end of', 'deadline', 'mark', 'review', 'action needed', 'follow up', 'respond', 'reply', 'complete', 'finish', 'send me', 'provide'];
+    const skipDomains = ['github.com', 'netlify.com', 'gitguardian', 'dbs.com', 'tngdigital', 'spgroup.com', 'flyscoot', 'fairpricegroup', 'webull', 'jobs2web', 'linkedin.com', 'noreply'];
+    const skipSubjects = ['transaction', 'receipt', 'invoice', 'alert', 'notification', 'linkpoints', 'price update', 'summary is here'];
+
+    const suggestions = [];
+
+    emails.forEach(e => {
+      // Skip automated/system emails
+      const fromLower = e.from.toLowerCase();
+      const subjectLower = e.subject.toLowerCase();
+      const snippetLower = e.snippet.toLowerCase();
+
+      if (skipDomains.some(d => fromLower.includes(d))) return;
+      if (skipSubjects.some(s => subjectLower.includes(s))) return;
+
+      // Check if email contains task keywords
+      const combined = subjectLower + ' ' + snippetLower;
+      const hasTask = taskKeywords.some(k => combined.includes(k));
+
+      // Also flag self-sent emails
+      const isSelfSent = fromLower.includes('iammhdrhm') || fromLower.includes('mohammad shodiieurrohiim');
+
+      if (hasTask || isSelfSent) {
+        // Determine priority
+        let priority = 'p2';
+        if (combined.includes('tomorrow') || combined.includes('today') || combined.includes('urgent') || combined.includes('asap')) priority = 'p1';
+        if (combined.includes('when you can') || combined.includes('no rush')) priority = 'p3';
+
+        // Determine due date
+        let due = 'No deadline';
+        if (combined.includes('tomorrow')) due = 'Tomorrow';
+        else if (combined.includes('today')) due = 'Today';
+        else if (combined.includes('this week') || combined.includes('end of week')) due = 'This week';
+        else if (combined.includes('by friday')) due = 'Friday';
+
+        // Extract sender name
+        const fromName = e.from.replace(/<.*>/, '').trim() || e.from;
+
+        suggestions.push({
+          task: e.subject.replace(/\[.*?\]/g, '').trim(),
+          priority,
+          due,
+          from: fromName
+        });
+      }
     });
-
-    const result = await res.json();
-    console.log('API result:', JSON.stringify(result));
-    const suggestions = result.suggestions || [];
 
     if (!suggestions.length) {
       el.innerHTML = '<div class="scan-status">✅ No action items found in your recent emails — inbox looking good!</div>';
