@@ -679,12 +679,12 @@ async function getGmailToken() {
 
 async function fetchRecentEmails() {
   const token = await getGmailToken();
-  const res = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=newer_than:7d+in:inbox', {
+  const res = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=newer_than:30d+in:inbox', {
     headers: { Authorization: 'Bearer ' + token }
   });
   const data = await res.json();
   if (!data.messages) return [];
-  const emails = await Promise.all(data.messages.slice(0, 15).map(async m => {
+  const emails = await Promise.all(data.messages.slice(0, 50).map(async m => {
     const r = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To`, {
       headers: { Authorization: 'Bearer ' + token }
     });
