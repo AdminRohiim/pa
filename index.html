@@ -37,7 +37,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
 .greeting { font-size: 20px; font-weight: 600; margin-bottom: 2px; }
 .subtext { font-size: 13px; color: #888; margin-bottom: 16px; }
-.next-pill { display: inline-flex; align-items: center; gap: 6px; background: #FAEEDA; color: #854F0B; border-radius: 20px; font-size: 12px; font-weight: 500; padding: 5px 14px; }
+.next-pill { display: none; align-items: center; gap: 6px; background: #FAEEDA; color: #854F0B; border-radius: 20px; font-size: 12px; font-weight: 500; padding: 5px 14px; }
 .filter-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-btn { font-size: 12px; padding: 3px 12px; border-radius: 20px; border: 1px solid #e0ddd5; background: transparent; color: #777; cursor: pointer; }
 .filter-btn.active { background: #f0ede5; color: #1a1a1a; border-color: #ccc; }
@@ -148,7 +148,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="stat"><div class="stat-num" id="task-count">0</div><div class="stat-lbl">open tasks</div></div>
       <div class="stat"><div class="stat-num" id="p1-count">0</div><div class="stat-lbl">urgent (P1)</div></div>
     </div>
-    <span class="next-pill">⏳ <span id="next-text">Loading calendar...</span></span>
+    <span class="next-pill" id="next-pill">⏳ <span id="next-text"></span></span>
   </div>
 
 
@@ -495,9 +495,14 @@ async function loadCalendar() {
       if (mins !== null && mins > 0 && mins < minMins) { minMins = mins; nextEvent = e; }
     });
 
-    document.getElementById('next-text').textContent = nextEvent
-      ? `Next: ${nextEvent.summary} in ${minMins} min`
-      : allEvents.length > 0 ? 'No upcoming meetings' : 'No events today — enjoy! 🎉';
+    const nextPill = document.getElementById('next-pill');
+    if (nextEvent) {
+      nextPill.style.display = 'inline-flex';
+      document.getElementById('next-text').textContent = `Next: ${nextEvent.summary} in ${minMins} min`;
+    } else {
+      nextPill.style.display = 'none';
+      document.getElementById('next-text').textContent = '';
+    }
 
     const calList = document.getElementById('cal-list');
     calList.innerHTML = allEvents.length === 0
@@ -520,7 +525,8 @@ async function loadCalendar() {
     document.getElementById('cal-list').innerHTML = `<div style="font-size:12px;color:#e55;padding:8px;">Could not load calendar: ${err.message}</div>`;
     document.getElementById('week-calendar').innerHTML = `<div style="font-size:12px;color:#e55;padding:14px;">Could not load week calendar: ${err.message}</div>`;
     document.getElementById('meet-count').textContent = '—';
-    document.getElementById('next-text').textContent = 'Calendar unavailable';
+    document.getElementById('next-pill').style.display = 'none';
+    document.getElementById('next-text').textContent = '';
   }
 }
 
