@@ -92,18 +92,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .btn-review { background: #5856D6; color: white; }
 
 .week-cal { overflow-x: auto; }
-.week-calendar { --week-cols: repeat(7, minmax(0, 1fr)); width: 100%; min-width: 760px; border: 1px solid #eeeae2; border-radius: 14px; overflow: hidden; background: #fff; }
-.week-header, .week-grid { display: grid; grid-template-columns: var(--week-cols); }
-.week-header { background: #f8f7f3; border-bottom: 1px solid #eeeae2; }
-.week-day-head { padding: 10px 8px; text-align: center; border-left: 1px solid #eeeae2; min-width: 0; }
-.week-day-head:first-child { border-left: none; }
+.week-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; min-width: 760px; border: 1px solid #eeeae2; border-radius: 14px; overflow: hidden; background: #fff; }
+.week-day { min-width: 0; border-left: 1px solid #eeeae2; background: #fff; }
+.week-day:first-child { border-left: none; }
+.week-day-head { padding: 10px 8px; text-align: center; background: #f8f7f3; border-bottom: 1px solid #eeeae2; min-width: 0; height: 70px; }
 .week-day-name { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.04em; }
 .week-day-num { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-top: 4px; font-size: 14px; font-weight: 600; color: #1a1a1a; }
-.week-day-head.today .week-day-num { background: #1D9E75; color: white; }
-.week-grid { min-height: 260px; }
-.week-day-col { padding: 8px; border-left: 1px solid #eeeae2; min-height: 260px; min-width: 0; }
-.week-day-col:first-child { border-left: none; }
-.week-event { background: #E1F5EE; border-left: 3px solid #1D9E75; border-radius: 8px; padding: 7px 8px; margin-bottom: 6px; font-size: 12px; line-height: 1.3; max-width: 100%; overflow: hidden; }
+.week-day.today .week-day-num { background: #1D9E75; color: white; }
+.week-day-body { padding: 8px; min-height: 260px; }
+.week-event { background: #E1F5EE; border-left: 3px solid #1D9E75; border-radius: 8px; padding: 7px 8px; margin-bottom: 6px; font-size: 12px; line-height: 1.3; width: 100%; max-width: 100%; overflow: hidden; }
 .week-event-time { font-size: 11px; font-weight: 600; color: #0F6E56; margin-bottom: 2px; }
 .week-event-title { color: #1a1a1a; font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .week-empty { font-size: 12px; color: #bbb; text-align: center; padding-top: 18px; }
@@ -558,32 +555,32 @@ function renderWeekCalendar(weekStart, events) {
     return d;
   });
 
-  range.textContent = `${days[0].toLocaleDateString('en-SG', { day:'numeric', month:'short' })} – ${days[6].toLocaleDateString('en-SG', { day:'numeric', month:'short', year:'numeric' })}`;
-
-  const header = days.map(d => `
-    <div class="week-day-head${isSameLocalDay(d, today) ? ' today' : ''}">
-      <div class="week-day-name">${d.toLocaleDateString('en-SG', { weekday:'short' })}</div>
-      <div class="week-day-num">${d.getDate()}</div>
-    </div>`).join('');
-
-  const cols = days.map(d => {
-    const dayEvents = events
+  const dayCards = days.map(d => {
+    const eventsForDay = events
       .filter(e => isSameLocalDay(getEventStartDate(e), d))
-      .sort((a,b) => getEventStartDate(a) - getEventStartDate(b));
+      .sort((a, b) => getEventStartDate(a) - getEventStartDate(b));
 
-    const items = dayEvents.length === 0
+    const items = eventsForDay.length === 0
       ? '<div class="week-empty">Free</div>'
-      : dayEvents.map(e => `
+      : eventsForDay.map(e => `
           <div class="week-event" title="${escHtml(e.summary || 'Untitled')}">
             <div class="week-event-time">${formatTime(e.start?.dateTime || e.start?.date)}</div>
             <div class="week-event-title">${escHtml(e.summary || 'Untitled')}</div>
-          </div>
-        `).join('');
+          </div>`).join('');
 
-    return `<div class="week-day-col">${items}</div>`;
+    return `<div class="week-day${isSameLocalDay(d, today) ? ' today' : ''}">
+      <div class="week-day-head">
+        <div class="week-day-name">${d.toLocaleDateString('en-SG', { weekday:'short' })}</div>
+        <div class="week-day-num">${d.getDate()}</div>
+      </div>
+      <div class="week-day-body">${items}</div>
+    </div>`;
   }).join('');
 
-  wrap.innerHTML = `<div class="week-header">${header}</div><div class="week-grid">${cols}</div>`;
+  wrap.innerHTML = dayCards;
+  const weekEndDisplay = new Date(weekStart);
+  weekEndDisplay.setDate(weekStart.getDate() + 6);
+  range.textContent = `${weekStart.toLocaleDateString('en-SG', { day:'numeric', month:'short' })} – ${weekEndDisplay.toLocaleDateString('en-SG', { day:'numeric', month:'short', year:'numeric' })}`;
 }
 function filterCal(type, btn) {
   document.querySelectorAll('.filter-row')[0].querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
