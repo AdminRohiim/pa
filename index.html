@@ -167,7 +167,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
     <div class="week-legend">
-      <span>Blue = meetings · Amber = task due dates · v2 task sync</span>
+      <span>Blue = meetings · Amber = task due dates · v3 date sync · v2 task sync</span>
       <span id="week-range">—</span>
     </div>
   </div>
@@ -563,9 +563,21 @@ function getTaskDueDate(task, referenceDate = new Date()) {
   const raw = (task?.due || '').trim();
   if (!raw || /^no deadline$/i.test(raw)) return null;
 
-  const normalized = raw.toLowerCase();
   const base = new Date(referenceDate);
   base.setHours(0,0,0,0);
+
+  const makeDate = (year, monthIndex, day) => {
+    const d = new Date(year, monthIndex, day);
+    d.setHours(0,0,0,0);
+    return d;
+  };
+
+  const normalized = raw
+    .toLowerCase()
+    .replace(/,/g, ' ')
+    .replace(/(\d{1,2})(st|nd|rd|th)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   if (normalized === 'today') return new Date(base);
   if (normalized === 'tomorrow') {
@@ -590,7 +602,39 @@ function getTaskDueDate(task, referenceDate = new Date()) {
     return d;
   }
 
-  const parsed = new Date(raw);
+  const monthMap = {
+    january:0, jan:0, february:1, feb:1, march:2, mar:2, april:3, apr:3, may:4,
+    june:5, jun:5, july:6, jul:6, august:7, aug:7, september:8, sep:8, sept:8,
+    october:9, oct:9, november:10, nov:10, december:11, dec:11
+  };
+
+  // Examples: 5th June 2026, 5 June, 5 Jun 26
+  let match = normalized.match(/^(\d{1,2})\s+([a-z]+)\s*(\d{2,4})?$/);
+  if (match && monthMap[match[2]] !== undefined) {
+    let year = match[3] ? parseInt(match[3], 10) : base.getFullYear();
+    if (year < 100) year += 2000;
+    return makeDate(year, monthMap[match[2]], parseInt(match[1], 10));
+  }
+
+  // Examples: June 5th 2026, Jun 5, Jun 5 26
+  match = normalized.match(/^([a-z]+)\s+(\d{1,2})\s*(\d{2,4})?$/);
+  if (match && monthMap[match[1]] !== undefined) {
+    let year = match[3] ? parseInt(match[3], 10) : base.getFullYear();
+    if (year < 100) year += 2000;
+    return makeDate(year, monthMap[match[1]], parseInt(match[2], 10));
+  }
+
+  // Singapore-friendly numeric dates: 5/6/2026, 05-06-2026, 5.6.26 = 5 June 2026
+  match = normalized.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?$/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    let year = match[3] ? parseInt(match[3], 10) : base.getFullYear();
+    if (year < 100) year += 2000;
+    return makeDate(year, month, day);
+  }
+
+  const parsed = new Date(normalized);
   if (!isNaN(parsed)) {
     parsed.setHours(0,0,0,0);
     return parsed;
