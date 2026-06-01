@@ -101,9 +101,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .week-day.today .week-day-num { background: #1D9E75; color: white; }
 .week-day-body { padding: 8px; min-height: 260px; }
 .week-event { border-radius: 8px; padding: 7px 8px; margin-bottom: 6px; font-size: 12px; line-height: 1.3; width: 100%; max-width: 100%; overflow: hidden; }
-.week-event.meeting { background: #E8F1FF; border-left: 3px solid #378ADD; }
+.week-event.meeting { background: #E8F1FF !important; border-left: 3px solid #378ADD !important; }
 .week-event.meeting .week-event-time { color: #245EAE; }
-.week-event.task { background: #FFF4DD; border-left: 3px solid #E3A52B; }
+.week-event.task { background: #FFF4DD !important; border-left: 3px solid #E3A52B !important; }
 .week-event.task .week-event-time { color: #9A6500; }
 .week-event-title { color: #1a1a1a; font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .week-event-time { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
@@ -167,7 +167,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
     <div class="week-legend">
-      <span>Blue = meetings · Amber = task due dates</span>
+      <span>Blue = meetings · Amber = task due dates · v2 task sync</span>
       <span id="week-range">—</span>
     </div>
   </div>
@@ -411,7 +411,7 @@ function saveTask() {
   } else {
     tasks.push({ id: Date.now().toString(), name, priority, due, done: false });
   }
-  saveTasks(); renderTasks(); closeModal();
+  saveTasks(); renderTasks(); refreshWeekCalendar(); closeModal();
 }
 
 document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
@@ -652,7 +652,7 @@ function renderWeekCalendar(weekStart, events, taskItems) {
     const items = dayItems.length === 0
       ? '<div class="week-empty">Free</div>'
       : dayItems.map(item => `
-          <div class="week-event ${item.type}" title="${escHtml(item.title)}">
+          <div class="week-event ${item.type}" style="${item.type === 'meeting' ? 'background:#E8F1FF;border-left:3px solid #378ADD;' : 'background:#FFF4DD;border-left:3px solid #E3A52B;'}" title="${escHtml(item.title)}">
             <div class="week-event-time">${escHtml(item.timeLabel)}</div>
             <div class="week-event-title">${escHtml(item.title)}</div>
             <div class="week-event-tag">${escHtml(item.tag)}</div>
@@ -985,7 +985,7 @@ async function scanEmails() {
 
 function addSuggestion(i, s) {
   tasks.push({ id: Date.now().toString(), name: s.task, priority: s.priority || 'p2', due: s.due || 'No deadline', done: false });
-  saveTasks(); renderTasks();
+  saveTasks(); renderTasks(); refreshWeekCalendar();
   const el = document.getElementById('sug-' + i);
   if (el) { el.style.opacity = '0.4'; el.querySelector('.suggestion-add').textContent = '✓ Added'; el.querySelector('.suggestion-add').disabled = true; }
 }
