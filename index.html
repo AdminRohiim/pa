@@ -100,9 +100,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .week-day-num { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-top: 4px; font-size: 14px; font-weight: 600; color: #1a1a1a; }
 .week-day.today .week-day-num { background: #1D9E75; color: white; }
 .week-day-body { padding: 8px; min-height: 260px; }
-.week-event { background: #E1F5EE; border-left: 3px solid #1D9E75; border-radius: 8px; padding: 7px 8px; margin-bottom: 6px; font-size: 12px; line-height: 1.3; width: 100%; max-width: 100%; overflow: hidden; }
-.week-event-time { font-size: 11px; font-weight: 600; color: #0F6E56; margin-bottom: 2px; }
+.week-event { border-radius: 8px; padding: 7px 8px; margin-bottom: 6px; font-size: 12px; line-height: 1.3; width: 100%; max-width: 100%; overflow: hidden; }
+.week-event.meeting { background: #E8F1FF; border-left: 3px solid #378ADD; }
+.week-event.meeting .week-event-time { color: #245EAE; }
+.week-event.task { background: #FFF4DD; border-left: 3px solid #E3A52B; }
+.week-event.task .week-event-time { color: #9A6500; }
 .week-event-title { color: #1a1a1a; font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.week-event-time { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+.week-event-tag { display: inline-block; margin-top: 4px; font-size: 10px; font-weight: 600; border-radius: 999px; padding: 2px 6px; }
+.week-event.meeting .week-event-tag { background: #D7E8FF; color: #245EAE; }
+.week-event.task .week-event-tag { background: #FBE7B7; color: #9A6500; }
 .week-empty { font-size: 12px; color: #bbb; text-align: center; padding-top: 18px; }
 .week-legend { font-size: 12px; color: #888; margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 
@@ -160,7 +167,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
     <div class="week-legend">
-      <span>Shows this week from your Google Calendar</span>
+      <span>Blue = meetings · Amber = task due dates</span>
       <span id="week-range">—</span>
     </div>
   </div>
@@ -335,6 +342,7 @@ function renderTasks() {
       </div>`).join('');
   }
   updateStats();
+  refreshWeekCalendar();
 }
 
 function escHtml(str) {
@@ -486,7 +494,7 @@ async function loadCalendar() {
     allWeekEvents = data.items || [];
     allEvents = allWeekEvents.filter(e => isSameLocalDay(getEventStartDate(e), now));
 
-    renderWeekCalendar(weekStart, allWeekEvents);
+    refreshWeekCalendar(weekStart);
 
     document.getElementById('meet-count').textContent = allEvents.length;
     let nextEvent = null, minMins = Infinity;
@@ -551,7 +559,63 @@ function isSameLocalDay(a, b) {
          a.getDate() === b.getDate();
 }
 
-function renderWeekCalendar(weekStart, events) {
+function getTaskDueDate(task, referenceDate = new Date()) {
+  const raw = (task?.due || '').trim();
+  if (!raw || /^no deadline$/i.test(raw)) return null;
+
+  const normalized = raw.toLowerCase();
+  const base = new Date(referenceDate);
+  base.setHours(0,0,0,0);
+
+  if (normalized === 'today') return new Date(base);
+  if (normalized === 'tomorrow') {
+    const d = new Date(base);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+  if (normalized === 'this week' || normalized === 'end of week') {
+    const d = new Date(base);
+    const diff = (5 - d.getDay() + 7) % 7; // Friday
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  const dayMap = { sunday:0, sun:0, monday:1, mon:1, tuesday:2, tue:2, tues:2, wednesday:3, wed:3, thursday:4, thu:4, thur:4, thurs:4, friday:5, fri:5, saturday:6, sat:6 };
+  if (normalized in dayMap) {
+    const target = dayMap[normalized];
+    const d = new Date(base);
+    let diff = target - d.getDay();
+    if (diff < 0) diff += 7;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  const parsed = new Date(raw);
+  if (!isNaN(parsed)) {
+    parsed.setHours(0,0,0,0);
+    return parsed;
+  }
+
+  return null;
+}
+
+function getOpenTasksForWeek(weekStart) {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23,59,59,999);
+
+  return tasks
+    .filter(t => !t.done)
+    .map(t => ({ ...t, dueDate: getTaskDueDate(t) }))
+    .filter(t => t.dueDate && t.dueDate >= weekStart && t.dueDate <= weekEnd);
+}
+
+function refreshWeekCalendar(weekStartArg) {
+  const weekStart = weekStartArg || getWeekStart(new Date());
+  renderWeekCalendar(weekStart, allWeekEvents, getOpenTasksForWeek(weekStart));
+}
+
+function renderWeekCalendar(weekStart, events, taskItems) {
   const wrap = document.getElementById('week-calendar');
   const range = document.getElementById('week-range');
   const today = new Date();
@@ -564,14 +628,34 @@ function renderWeekCalendar(weekStart, events) {
   const dayCards = days.map(d => {
     const eventsForDay = events
       .filter(e => isSameLocalDay(getEventStartDate(e), d))
-      .sort((a, b) => getEventStartDate(a) - getEventStartDate(b));
+      .sort((a, b) => getEventStartDate(a) - getEventStartDate(b))
+      .map(e => ({
+        type: 'meeting',
+        title: e.summary || 'Untitled',
+        timeLabel: formatTime(e.start?.dateTime || e.start?.date),
+        tag: 'Google',
+        sortKey: getEventStartDate(e)?.getTime() || 0
+      }));
 
-    const items = eventsForDay.length === 0
+    const tasksForDay = (taskItems || [])
+      .filter(t => isSameLocalDay(t.dueDate, d))
+      .map(t => ({
+        type: 'task',
+        title: t.name,
+        timeLabel: 'Due task',
+        tag: t.priority ? t.priority.toUpperCase() : 'Task',
+        sortKey: 9999999999999
+      }));
+
+    const dayItems = [...eventsForDay, ...tasksForDay].sort((a, b) => a.sortKey - b.sortKey);
+
+    const items = dayItems.length === 0
       ? '<div class="week-empty">Free</div>'
-      : eventsForDay.map(e => `
-          <div class="week-event" title="${escHtml(e.summary || 'Untitled')}">
-            <div class="week-event-time">${formatTime(e.start?.dateTime || e.start?.date)}</div>
-            <div class="week-event-title">${escHtml(e.summary || 'Untitled')}</div>
+      : dayItems.map(item => `
+          <div class="week-event ${item.type}" title="${escHtml(item.title)}">
+            <div class="week-event-time">${escHtml(item.timeLabel)}</div>
+            <div class="week-event-title">${escHtml(item.title)}</div>
+            <div class="week-event-tag">${escHtml(item.tag)}</div>
           </div>`).join('');
 
     return `<div class="week-day${isSameLocalDay(d, today) ? ' today' : ''}">
