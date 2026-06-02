@@ -118,6 +118,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .calendar-nav button, .calendar-nav select { font-size: 12px; padding: 5px 10px; border-radius: 20px; border: 1px solid #e0ddd5; background: #fff; color: #555; cursor: pointer; }
 .calendar-nav button:hover, .calendar-nav select:hover { background: #f5f4f0; }
 .calendar-hint { font-size: 12px; color: #999; }
+.quick-due-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.quick-due-row button { font-size: 11px; padding: 4px 9px; border-radius: 999px; border: 1px solid #e0ddd5; background: #f8f7f3; color: #555; cursor: pointer; }
+.quick-due-row button:hover { background: #f0ede5; }
+.overdue-card { border-color: #F0C4C4; background: #FFF9F9; }
+.overdue-list { display: grid; gap: 8px; }
+.overdue-item { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #F4D2D2; border-radius: 10px; padding: 9px 10px; cursor: pointer; }
+.overdue-item:hover { background: #FFF1F1; }
+.overdue-title { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+.overdue-meta { font-size: 11px; color: #A32D2D; margin-top: 2px; }
+.overdue-empty { font-size: 13px; color: #999; padding: 4px 0; }
+.week-event.task { cursor: pointer; }
+.week-event.task:hover { filter: brightness(0.98); }
 
 
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
@@ -144,7 +156,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <option value="p4">⚪ P4 — Backlog</option>
     </select>
     <label>Due date</label>
-    <input type="text" id="task-due" placeholder="e.g. Today, Tomorrow, 5 June 2026, 05/06/2026" />
+    <input type="date" id="task-due" />
+    <div class="quick-due-row">
+      <button type="button" onclick="setQuickDue(0)">Today</button>
+      <button type="button" onclick="setQuickDue(1)">Tomorrow</button>
+      <button type="button" onclick="clearDueDate()">No deadline</button>
+    </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-save" onclick="saveTask()">Save</button>
@@ -165,6 +182,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <span class="next-pill" id="next-pill">⏳ <span id="next-text"></span></span>
   </div>
 
+  <div class="card card-full overdue-card" id="overdue-card" style="display:none;">
+    <div class="section-label">⚠️ Overdue Tasks</div>
+    <div id="overdue-list" class="overdue-list"></div>
+  </div>
 
   <div class="card card-full">
     <div class="calendar-toolbar">
@@ -187,7 +208,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
     <div class="week-legend">
-      <span>Blue = meetings · Amber = task due dates · v5 range toggle</span>
+      <span>Blue = meetings · Amber = task due dates · v6 date picker + overdue</span>
       <span id="week-range">—</span>
     </div>
   </div>
@@ -355,7 +376,7 @@ function renderTasks() {
         <div class="task-check${t.done ? ' done' : ''}" onclick="toggleTask('${t.id}')">${t.done ? '✓' : ''}</div>
         <div style="flex:1;min-width:0">
           <div class="task-text${t.done ? ' done' : ''}">${escHtml(t.name)} <span class="p-badge ${t.priority}">${t.priority.toUpperCase()}</span></div>
-          <div style="font-size:12px;color:#aaa;margin-top:2px">${escHtml(t.due || 'No deadline')}</div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px">${escHtml(formatDueForDisplay(t.due))}</div>
         </div>
         <div class="task-actions">
           <button class="task-action-btn" onclick="openEditModal('${t.id}')" title="Edit">✏️</button>
@@ -364,11 +385,38 @@ function renderTasks() {
       </div>`).join('');
   }
   updateStats();
+  renderOverdueTasks();
   refreshWeekCalendar();
 }
 
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toDateInputValue(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d)) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatDueForDisplay(raw) {
+  const parsed = getTaskDueDate({ due: raw });
+  if (!parsed) return raw || 'No deadline';
+  return parsed.toLocaleDateString('en-SG', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function setQuickDue(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  document.getElementById('task-due').value = toDateInputValue(d);
+}
+
+function clearDueDate() {
+  document.getElementById('task-due').value = '';
 }
 
 function updateStats() {
@@ -393,6 +441,42 @@ function deleteTask(id) {
   saveTasks(); renderTasks();
 }
 
+function isOverdueTask(task) {
+  if (task.done) return false;
+  const dueDate = getTaskDueDate(task);
+  if (!dueDate) return false;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  return dueDate < today;
+}
+
+function renderOverdueTasks() {
+  const card = document.getElementById('overdue-card');
+  const list = document.getElementById('overdue-list');
+  if (!card || !list) return;
+
+  const overdue = tasks
+    .filter(isOverdueTask)
+    .map(t => ({ ...t, dueDate: getTaskDueDate(t) }))
+    .sort((a, b) => a.dueDate - b.dueDate);
+
+  if (!overdue.length) {
+    card.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  card.style.display = '';
+  list.innerHTML = overdue.map(t => `
+    <div class="overdue-item" onclick="openEditModal('${t.id}')">
+      <div style="font-size:16px;">⚠️</div>
+      <div style="flex:1;min-width:0;">
+        <div class="overdue-title">${escHtml(t.name)} <span class="p-badge ${t.priority}">${t.priority.toUpperCase()}</span></div>
+        <div class="overdue-meta">Due ${escHtml(formatDueForDisplay(t.due))} · click to edit</div>
+      </div>
+    </div>`).join('');
+}
+
 // ── MODAL ──
 function openModal() {
   editingId = null;
@@ -411,7 +495,7 @@ function openEditModal(id) {
   document.getElementById('modal-title').textContent = 'Edit Task';
   document.getElementById('task-input').value = t.name;
   document.getElementById('task-priority').value = t.priority;
-  document.getElementById('task-due').value = t.due || '';
+  document.getElementById('task-due').value = toDateInputValue(getTaskDueDate(t));
   document.getElementById('modal').classList.add('open');
   setTimeout(() => document.getElementById('task-input').focus(), 50);
 }
@@ -723,6 +807,7 @@ function renderWeekCalendar(weekStart, events, taskItems, numDays = 7) {
       .filter(t => isSameLocalDay(t.dueDate, d))
       .map(t => ({
         type: 'task',
+        id: t.id,
         title: t.name,
         timeLabel: 'Due task',
         tag: t.priority ? t.priority.toUpperCase() : 'Task',
@@ -733,12 +818,16 @@ function renderWeekCalendar(weekStart, events, taskItems, numDays = 7) {
 
     const items = dayItems.length === 0
       ? '<div class="week-empty">Free</div>'
-      : dayItems.map(item => `
-          <div class="week-event ${item.type}" style="${item.type === 'meeting' ? 'background:#E8F1FF;border-left:3px solid #378ADD;' : 'background:#FFF4DD;border-left:3px solid #E3A52B;'}" title="${escHtml(item.title)}">
+      : dayItems.map(item => {
+          const clickAttr = item.type === 'task' && item.id ? ` onclick="openEditModal('${item.id}')"` : '';
+          const titleAttr = item.type === 'task' ? `${item.title} — click to edit` : item.title;
+          return `
+          <div class="week-event ${item.type}"${clickAttr} style="${item.type === 'meeting' ? 'background:#E8F1FF;border-left:3px solid #378ADD;' : 'background:#FFF4DD;border-left:3px solid #E3A52B;'}" title="${escHtml(titleAttr)}">
             <div class="week-event-time">${escHtml(item.timeLabel)}</div>
             <div class="week-event-title">${escHtml(item.title)}</div>
             <div class="week-event-tag">${escHtml(item.tag)}</div>
-          </div>`).join('');
+          </div>`;
+        }).join('');
 
     return `<div class="week-day${isSameLocalDay(d, today) ? ' today' : ''}">
       <div class="week-day-head">
