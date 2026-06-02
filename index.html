@@ -132,6 +132,44 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .week-event.task:hover { filter: brightness(0.98); }
 
 
+.focus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.focus-item { background: #f5f4f0; border-radius: 12px; padding: 12px; }
+.focus-num { font-size: 22px; font-weight: 700; }
+.focus-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+.focus-note { font-size: 13px; color: #555; margin-top: 12px; }
+.upcoming-list { display: grid; gap: 8px; }
+.upcoming-item { display: flex; align-items: center; gap: 10px; border: 1px solid #eeeae2; background: #fff; border-radius: 10px; padding: 9px 10px; cursor: pointer; }
+.upcoming-item:hover { background: #f8f7f3; }
+.upcoming-date { min-width: 72px; font-size: 11px; font-weight: 700; color: #777; text-transform: uppercase; }
+.upcoming-title { font-size: 13px; font-weight: 600; }
+.upcoming-meta { font-size: 11px; color: #999; margin-top: 2px; }
+.backup-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.backup-row .action-btn { width: auto; margin-top: 0; }
+.repeat-label { font-size: 11px; color: #999; margin-left: 4px; }
+.week-event.task.p1 { background: #FCEBEB !important; border-left-color: #A32D2D !important; }
+.week-event.task.p1 .week-event-time { color: #A32D2D !important; }
+.week-event.task.p1 .week-event-tag { background: #F8D3D3; color: #A32D2D; }
+.week-event.task.p2 { background: #FAEEDA !important; border-left-color: #D18A00 !important; }
+.week-event.task.p2 .week-event-time { color: #854F0B !important; }
+.week-event.task.p2 .week-event-tag { background: #F5D8A5; color: #854F0B; }
+.week-event.task.p3 { background: #E1F5EE !important; border-left-color: #1D9E75 !important; }
+.week-event.task.p3 .week-event-time { color: #0F6E56 !important; }
+.week-event.task.p3 .week-event-tag { background: #CFECE2; color: #0F6E56; }
+.week-event.task.p4 { background: #F1EFE8 !important; border-left-color: #8B8981 !important; }
+.week-event.task.p4 .week-event-time { color: #5F5E5A !important; }
+.week-event.task.p4 .week-event-tag { background: #E4E1D8; color: #5F5E5A; }
+.mobile-agenda { display: none; margin-top: 12px; }
+.agenda-day { border: 1px solid #eeeae2; border-radius: 12px; overflow: hidden; margin-bottom: 8px; background: #fff; }
+.agenda-day-head { background: #f8f7f3; padding: 9px 10px; font-size: 12px; font-weight: 700; color: #555; }
+.agenda-item { padding: 9px 10px; border-top: 1px solid #f0ede5; font-size: 13px; }
+.agenda-time { font-size: 11px; font-weight: 700; color: #777; margin-bottom: 2px; }
+@media (max-width: 600px) {
+  .focus-grid { grid-template-columns: repeat(2, 1fr); }
+  .week-cal { display: none; }
+  .mobile-agenda { display: block; }
+  .calendar-nav { width: 100%; justify-content: flex-start; }
+}
+
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 @media (max-width: 600px) { .dash { grid-template-columns: 1fr; } .tg-grid { grid-template-columns: 1fr; } }
 </style>
@@ -162,6 +200,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button type="button" onclick="setQuickDue(1)">Tomorrow</button>
       <button type="button" onclick="clearDueDate()">No deadline</button>
     </div>
+    <label>Repeat</label>
+    <select id="task-repeat">
+      <option value="none" selected>No repeat</option>
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-save" onclick="saveTask()">Save</button>
@@ -180,6 +225,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="stat"><div class="stat-num" id="p1-count">0</div><div class="stat-lbl">urgent (P1)</div></div>
     </div>
     <span class="next-pill" id="next-pill">⏳ <span id="next-text"></span></span>
+  </div>
+
+  <div class="card card-full">
+    <div class="section-label">🎯 Today Focus</div>
+    <div class="focus-grid">
+      <div class="focus-item"><div class="focus-num" id="focus-meetings">—</div><div class="focus-lbl">meetings today</div></div>
+      <div class="focus-item"><div class="focus-num" id="focus-due-today">0</div><div class="focus-lbl">tasks due today</div></div>
+      <div class="focus-item"><div class="focus-num" id="focus-overdue">0</div><div class="focus-lbl">overdue tasks</div></div>
+      <div class="focus-item"><div class="focus-num" id="focus-p1">0</div><div class="focus-lbl">urgent tasks</div></div>
+    </div>
+    <div class="focus-note" id="focus-note">Loading today’s focus...</div>
   </div>
 
   <div class="card card-full overdue-card" id="overdue-card" style="display:none;">
@@ -207,8 +263,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="loading">Fetching your week...</div>
       </div>
     </div>
+    <div class="mobile-agenda" id="mobile-agenda"></div>
     <div class="week-legend">
-      <span>Blue = meetings · Amber = task due dates · v6 date picker + overdue</span>
+      <span>Blue = meetings · Tasks follow priority colours · v7 focus + backup</span>
       <span id="week-range">—</span>
     </div>
   </div>
@@ -237,6 +294,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
     <div style="font-size:12px;color:#aaa;margin-top:6px;" id="prog-lbl">0 of 0 done</div>
     <button class="action-btn btn-add" onclick="openModal()">+ Add task</button>
+  </div>
+
+  <div class="card">
+    <div class="section-label">📌 Upcoming Tasks</div>
+    <div id="upcoming-list" class="upcoming-list"><div class="loading" style="padding:12px 0">No upcoming tasks yet.</div></div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">💾 Backup & Clean-up</div>
+    <div style="font-size:13px;color:#666;margin-bottom:10px;">Export or import your task list so browser storage does not become your only copy.</div>
+    <div class="backup-row">
+      <button class="action-btn btn-ghost" onclick="exportTasks()">Export tasks</button>
+      <button class="action-btn btn-ghost" onclick="document.getElementById('import-file').click()">Import tasks</button>
+      <button class="action-btn btn-ghost" onclick="clearCompletedTasks()">Clear completed</button>
+    </div>
+    <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importTasks(event)" />
+    <div class="tg-log" id="backup-log"></div>
   </div>
 
   <div class="card card-full">
@@ -376,7 +450,7 @@ function renderTasks() {
         <div class="task-check${t.done ? ' done' : ''}" onclick="toggleTask('${t.id}')">${t.done ? '✓' : ''}</div>
         <div style="flex:1;min-width:0">
           <div class="task-text${t.done ? ' done' : ''}">${escHtml(t.name)} <span class="p-badge ${t.priority}">${t.priority.toUpperCase()}</span></div>
-          <div style="font-size:12px;color:#aaa;margin-top:2px">${escHtml(formatDueForDisplay(t.due))}</div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px">${escHtml(formatDueForDisplay(t.due))}${t.repeat && t.repeat !== 'none' ? `<span class="repeat-label">↻ ${escHtml(t.repeat)}</span>` : ''}</div>
         </div>
         <div class="task-actions">
           <button class="task-action-btn" onclick="openEditModal('${t.id}')" title="Edit">✏️</button>
@@ -386,6 +460,8 @@ function renderTasks() {
   }
   updateStats();
   renderOverdueTasks();
+  renderUpcomingTasks();
+  renderTodayFocus();
   refreshWeekCalendar();
 }
 
@@ -477,6 +553,132 @@ function renderOverdueTasks() {
     </div>`).join('');
 }
 
+function getUpcomingTaskItems(daysAhead = 7) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const rangeEnd = new Date(today);
+  rangeEnd.setDate(today.getDate() + daysAhead);
+  return getTaskOccurrencesForRange(today, daysAhead + 1)
+    .filter(item => item.dueDate >= today && item.dueDate <= rangeEnd)
+    .sort((a, b) => a.dueDate - b.dueDate || priorityRank(a.priority) - priorityRank(b.priority));
+}
+
+function priorityRank(priority) {
+  return ({ p1: 1, p2: 2, p3: 3, p4: 4 })[priority] || 9;
+}
+
+function renderUpcomingTasks() {
+  const list = document.getElementById('upcoming-list');
+  if (!list) return;
+  const items = getUpcomingTaskItems(7).slice(0, 8);
+  if (!items.length) {
+    list.innerHTML = '<div class="loading" style="padding:12px 0">No upcoming tasks in the next 7 days.</div>';
+    return;
+  }
+  list.innerHTML = items.map(item => `
+    <div class="upcoming-item" onclick="openEditModal('${item.id}')">
+      <div class="upcoming-date">${item.dueDate.toLocaleDateString('en-SG', { weekday:'short', day:'numeric', month:'short' })}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="upcoming-title">${escHtml(item.name)} <span class="p-badge ${item.priority}">${(item.priority || 'p3').toUpperCase()}</span></div>
+        <div class="upcoming-meta">${item.repeat && item.repeat !== 'none' ? 'Repeats ' + escHtml(item.repeat) + ' · ' : ''}click to edit</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderTodayFocus() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const tasksToday = getTaskOccurrencesForRange(today, 1).filter(t => isSameLocalDay(t.dueDate, today));
+  const overdueCount = tasks.filter(isOverdueTask).length;
+  const p1Count = tasks.filter(t => !t.done && t.priority === 'p1').length;
+  const nextEvent = allEvents
+    .filter(e => e.start?.dateTime && new Date(e.start.dateTime) > new Date())
+    .sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime))[0];
+
+  const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  setText('focus-meetings', allEvents.length || 0);
+  setText('focus-due-today', tasksToday.length || 0);
+  setText('focus-overdue', overdueCount || 0);
+  setText('focus-p1', p1Count || 0);
+
+  const note = document.getElementById('focus-note');
+  if (!note) return;
+  if (nextEvent) {
+    note.textContent = `Next meeting: ${nextEvent.summary || 'Untitled'} at ${formatTime(nextEvent.start.dateTime)}.`;
+  } else if (tasksToday.length) {
+    note.textContent = `You have ${tasksToday.length} task${tasksToday.length === 1 ? '' : 's'} due today.`;
+  } else if (overdueCount) {
+    note.textContent = `You have ${overdueCount} overdue task${overdueCount === 1 ? '' : 's'} to clear.`;
+  } else {
+    note.textContent = 'No urgent focus items for today.';
+  }
+}
+
+function showBackupLog(msg) {
+  const el = document.getElementById('backup-log');
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent = msg;
+  setTimeout(() => el.style.display = 'none', 3500);
+}
+
+function exportTasks() {
+  const payload = { exportedAt: new Date().toISOString(), version: 'v7', tasks };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pa-tasks-${toDateInputValue(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showBackupLog('✅ Tasks exported.');
+}
+
+function importTasks(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const imported = Array.isArray(parsed) ? parsed : parsed.tasks;
+      if (!Array.isArray(imported)) throw new Error('No tasks array found');
+      const cleaned = imported.map(t => ({
+        id: t.id || (Date.now().toString() + Math.random().toString(16).slice(2)),
+        name: t.name || 'Untitled task',
+        priority: ['p1','p2','p3','p4'].includes(t.priority) ? t.priority : 'p3',
+        due: t.due || 'No deadline',
+        repeat: ['none','daily','weekly','monthly'].includes(t.repeat) ? t.repeat : 'none',
+        done: !!t.done,
+        source: t.source || 'Imported'
+      }));
+      tasks = cleaned;
+      saveTasks();
+      renderTasks();
+      showBackupLog(`✅ Imported ${tasks.length} task${tasks.length === 1 ? '' : 's'}.`);
+    } catch (err) {
+      showBackupLog('❌ Import failed: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearCompletedTasks() {
+  const completed = tasks.filter(t => t.done).length;
+  if (!completed) { showBackupLog('No completed tasks to clear.'); return; }
+  if (!confirm(`Clear ${completed} completed task${completed === 1 ? '' : 's'}?`)) return;
+  tasks = tasks.filter(t => !t.done);
+  saveTasks();
+  renderTasks();
+  showBackupLog(`✅ Cleared ${completed} completed task${completed === 1 ? '' : 's'}.`);
+}
+
 // ── MODAL ──
 function openModal() {
   editingId = null;
@@ -484,6 +686,7 @@ function openModal() {
   document.getElementById('task-input').value = '';
   document.getElementById('task-priority').value = 'p3';
   document.getElementById('task-due').value = '';
+  document.getElementById('task-repeat').value = 'none';
   document.getElementById('modal').classList.add('open');
   setTimeout(() => document.getElementById('task-input').focus(), 50);
 }
@@ -496,6 +699,7 @@ function openEditModal(id) {
   document.getElementById('task-input').value = t.name;
   document.getElementById('task-priority').value = t.priority;
   document.getElementById('task-due').value = toDateInputValue(getTaskDueDate(t));
+  document.getElementById('task-repeat').value = t.repeat || 'none';
   document.getElementById('modal').classList.add('open');
   setTimeout(() => document.getElementById('task-input').focus(), 50);
 }
@@ -511,11 +715,12 @@ function saveTask() {
   document.getElementById('task-input').style.borderColor = '';
   const priority = document.getElementById('task-priority').value;
   const due = document.getElementById('task-due').value.trim() || 'No deadline';
+  const repeat = document.getElementById('task-repeat').value || 'none';
   if (editingId) {
     const t = tasks.find(t => t.id === editingId);
-    if (t) { t.name = name; t.priority = priority; t.due = due; }
+    if (t) { t.name = name; t.priority = priority; t.due = due; t.repeat = repeat; }
   } else {
-    tasks.push({ id: Date.now().toString(), name, priority, due, done: false });
+    tasks.push({ id: Date.now().toString(), name, priority, due, repeat, done: false, source: 'Manual' });
   }
   saveTasks(); renderTasks(); refreshWeekCalendar(); closeModal();
 }
@@ -524,7 +729,7 @@ document.getElementById('modal').addEventListener('click', e => { if (e.target =
 document.getElementById('task-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveTask(); });
 
 function filterTasks(type, btn) {
-  document.querySelectorAll('.filter-row')[1].querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentFilter = type;
   renderTasks();
@@ -636,12 +841,15 @@ async function loadCalendar() {
           </div>`;
         }).join('');
 
+    renderTodayFocus();
+
   } catch(err) {
     document.getElementById('cal-list').innerHTML = `<div style="font-size:12px;color:#e55;padding:8px;">Could not load calendar: ${err.message}</div>`;
     document.getElementById('week-calendar').innerHTML = `<div style="font-size:12px;color:#e55;padding:14px;">Could not load week calendar: ${err.message}</div>`;
     document.getElementById('meet-count').textContent = '—';
     document.getElementById('next-pill').style.display = 'none';
     document.getElementById('next-text').textContent = '';
+    renderTodayFocus();
   }
 }
 
@@ -762,20 +970,63 @@ function getTaskDueDate(task, referenceDate = new Date()) {
   return null;
 }
 
-function getOpenTasksForRange(rangeStart, numDays) {
-  const rangeEnd = new Date(rangeStart);
-  rangeEnd.setDate(rangeStart.getDate() + numDays);
+function addRepeat(date, repeat) {
+  const d = new Date(date);
+  if (repeat === 'daily') d.setDate(d.getDate() + 1);
+  else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
+  else if (repeat === 'monthly') {
+    const originalDay = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + 1);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(originalDay, lastDay));
+  }
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function getTaskOccurrencesForRange(rangeStart, numDays) {
+  const start = new Date(rangeStart);
+  start.setHours(0,0,0,0);
+  const rangeEnd = new Date(start);
+  rangeEnd.setDate(start.getDate() + numDays);
   rangeEnd.setMilliseconds(rangeEnd.getMilliseconds() - 1);
 
-  return tasks
-    .filter(t => !t.done)
-    .map(t => ({ ...t, dueDate: getTaskDueDate(t) }))
-    .filter(t => t.dueDate && t.dueDate >= rangeStart && t.dueDate <= rangeEnd);
+  const occurrences = [];
+  tasks.filter(t => !t.done).forEach(t => {
+    const firstDue = getTaskDueDate(t);
+    if (!firstDue) return;
+    const repeat = t.repeat || 'none';
+
+    if (repeat === 'none') {
+      if (firstDue >= start && firstDue <= rangeEnd) occurrences.push({ ...t, dueDate: firstDue });
+      return;
+    }
+
+    let occurrenceDate = new Date(firstDue);
+    let safety = 0;
+    while (occurrenceDate < start && safety < 500) {
+      occurrenceDate = addRepeat(occurrenceDate, repeat);
+      safety++;
+    }
+    while (occurrenceDate <= rangeEnd && safety < 700) {
+      occurrences.push({ ...t, dueDate: new Date(occurrenceDate), occurrenceLabel: repeat });
+      occurrenceDate = addRepeat(occurrenceDate, repeat);
+      safety++;
+    }
+  });
+  return occurrences;
+}
+
+function getOpenTasksForRange(rangeStart, numDays) {
+  return getTaskOccurrencesForRange(rangeStart, numDays);
 }
 
 function refreshWeekCalendar(rangeStartArg) {
   const rangeStart = rangeStartArg || currentCalendarStart || getWeekStart(new Date());
-  renderWeekCalendar(rangeStart, allWeekEvents, getOpenTasksForRange(rangeStart, currentCalendarDays), currentCalendarDays);
+  const taskItems = getOpenTasksForRange(rangeStart, currentCalendarDays);
+  renderWeekCalendar(rangeStart, allWeekEvents, taskItems, currentCalendarDays);
+  renderMobileAgenda(rangeStart, allWeekEvents, taskItems, currentCalendarDays);
 }
 
 function renderWeekCalendar(weekStart, events, taskItems, numDays = 7) {
@@ -809,9 +1060,10 @@ function renderWeekCalendar(weekStart, events, taskItems, numDays = 7) {
         type: 'task',
         id: t.id,
         title: t.name,
-        timeLabel: 'Due task',
+        priority: t.priority || 'p3',
+        timeLabel: t.repeat && t.repeat !== 'none' ? `Repeats ${t.repeat}` : 'Due task',
         tag: t.priority ? t.priority.toUpperCase() : 'Task',
-        sortKey: 9999999999999
+        sortKey: 9999999999999 + priorityRank(t.priority)
       }));
 
     const dayItems = [...eventsForDay, ...tasksForDay].sort((a, b) => a.sortKey - b.sortKey);
@@ -821,8 +1073,9 @@ function renderWeekCalendar(weekStart, events, taskItems, numDays = 7) {
       : dayItems.map(item => {
           const clickAttr = item.type === 'task' && item.id ? ` onclick="openEditModal('${item.id}')"` : '';
           const titleAttr = item.type === 'task' ? `${item.title} — click to edit` : item.title;
+          const priorityClass = item.type === 'task' ? ` ${item.priority || 'p3'}` : '';
           return `
-          <div class="week-event ${item.type}"${clickAttr} style="${item.type === 'meeting' ? 'background:#E8F1FF;border-left:3px solid #378ADD;' : 'background:#FFF4DD;border-left:3px solid #E3A52B;'}" title="${escHtml(titleAttr)}">
+          <div class="week-event ${item.type}${priorityClass}"${clickAttr} title="${escHtml(titleAttr)}">
             <div class="week-event-time">${escHtml(item.timeLabel)}</div>
             <div class="week-event-title">${escHtml(item.title)}</div>
             <div class="week-event-tag">${escHtml(item.tag)}</div>
@@ -842,6 +1095,32 @@ function renderWeekCalendar(weekStart, events, taskItems, numDays = 7) {
   const weekEndDisplay = new Date(weekStart);
   weekEndDisplay.setDate(weekStart.getDate() + numDays - 1);
   range.textContent = `${weekStart.toLocaleDateString('en-SG', { day:'numeric', month:'short' })} – ${weekEndDisplay.toLocaleDateString('en-SG', { day:'numeric', month:'short', year:'numeric' })}`;
+}
+
+function renderMobileAgenda(rangeStart, events, taskItems, numDays = 7) {
+  const wrap = document.getElementById('mobile-agenda');
+  if (!wrap) return;
+  const days = Array.from({ length: numDays }, (_, i) => {
+    const d = new Date(rangeStart);
+    d.setDate(rangeStart.getDate() + i);
+    return d;
+  });
+
+  wrap.innerHTML = days.map(d => {
+    const eventItems = events
+      .filter(e => isSameLocalDay(getEventStartDate(e), d))
+      .map(e => ({ type:'meeting', time: formatTime(e.start?.dateTime || e.start?.date), title: e.summary || 'Untitled', sortKey: getEventStartDate(e)?.getTime() || 0 }));
+    const taskAgenda = (taskItems || [])
+      .filter(t => isSameLocalDay(t.dueDate, d))
+      .map(t => ({ type:'task', id:t.id, time: `${(t.priority || 'p3').toUpperCase()} task due`, title: t.name, sortKey: 9999999999999 + priorityRank(t.priority) }));
+    const items = [...eventItems, ...taskAgenda].sort((a,b) => a.sortKey - b.sortKey);
+    const body = items.length ? items.map(item => `
+      <div class="agenda-item" ${item.type === 'task' ? `onclick="openEditModal('${item.id}')" style="cursor:pointer;"` : ''}>
+        <div class="agenda-time">${escHtml(item.time)}</div>
+        <div>${item.type === 'meeting' ? '🔵' : '✅'} ${escHtml(item.title)}</div>
+      </div>`).join('') : '<div class="agenda-item"><div class="agenda-time">Free</div><div>No meetings or tasks</div></div>';
+    return `<div class="agenda-day"><div class="agenda-day-head">${d.toLocaleDateString('en-SG', { weekday:'short', day:'numeric', month:'short' })}</div>${body}</div>`;
+  }).join('');
 }
 
 function moveCalendar(direction) {
@@ -1171,7 +1450,7 @@ async function scanEmails() {
 }
 
 function addSuggestion(i, s) {
-  tasks.push({ id: Date.now().toString(), name: s.task, priority: s.priority || 'p2', due: s.due || 'No deadline', done: false });
+  tasks.push({ id: Date.now().toString(), name: s.task, priority: s.priority || 'p2', due: s.due || 'No deadline', repeat: 'none', done: false, source: 'Gmail suggestion' });
   saveTasks(); renderTasks(); refreshWeekCalendar();
   const el = document.getElementById('sug-' + i);
   if (el) { el.style.opacity = '0.4'; el.querySelector('.suggestion-add').textContent = '✓ Added'; el.querySelector('.suggestion-add').disabled = true; }
