@@ -37,6 +37,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
 .greeting { font-size: 20px; font-weight: 600; margin-bottom: 2px; }
 .subtext { font-size: 13px; color: #888; margin-bottom: 16px; }
+.hero-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.hero-main { min-width: 240px; }
+.hero-note { font-size: 13px; color: #666; background: #f5f4f0; border-radius: 999px; padding: 8px 14px; }
+.hidden-stats { display: none; }
 .next-pill { display: none; align-items: center; gap: 6px; background: #FAEEDA; color: #854F0B; border-radius: 20px; font-size: 12px; font-weight: 500; padding: 5px 14px; }
 .filter-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-btn { font-size: 12px; padding: 3px 12px; border-radius: 20px; border: 1px solid #e0ddd5; background: transparent; color: #777; cursor: pointer; }
@@ -216,15 +220,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <div class="dash">
 
-  <div class="card card-full">
-    <div class="greeting" id="greeting">Hello, Mohammad 👋</div>
-    <div class="subtext" id="datestr"></div>
-    <div class="stat-row">
-      <div class="stat"><div class="stat-num" id="meet-count">—</div><div class="stat-lbl">meetings today</div></div>
-      <div class="stat"><div class="stat-num" id="task-count">0</div><div class="stat-lbl">open tasks</div></div>
-      <div class="stat"><div class="stat-num" id="p1-count">0</div><div class="stat-lbl">urgent (P1)</div></div>
+  <div class="card card-full hero-card">
+    <div class="hero-main">
+      <div class="greeting" id="greeting">Hello, Mohammad 👋</div>
+      <div class="subtext" id="datestr"></div>
     </div>
-    <span class="next-pill" id="next-pill">⏳ <span id="next-text"></span></span>
+    <div class="hero-note">Your day summary is below in Today Focus.</div>
+    <div class="hidden-stats" aria-hidden="true">
+      <span id="meet-count">—</span>
+      <span id="task-count">0</span>
+      <span id="p1-count">0</span>
+      <span id="next-pill"><span id="next-text"></span></span>
+    </div>
   </div>
 
   <div class="card card-full">
@@ -265,7 +272,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="mobile-agenda" id="mobile-agenda"></div>
     <div class="week-legend">
-      <span>Blue = meetings · Tasks follow priority colours · v7 focus + backup</span>
+      <span>Blue = meetings · Tasks follow priority colours · v7.1 cleaner focus</span>
       <span id="week-range">—</span>
     </div>
   </div>
