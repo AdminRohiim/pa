@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Personal Assistant — Mohammad</title>
+<title>Personal Assistant v9 — Mohammad</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; padding: 20px; color: #1a1a1a; }
@@ -190,8 +190,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .timeline-grid { grid-template-columns: 1fr; }
 }
 
+
+.task-search { width: 100%; border: 1px solid #e0ddd5; border-radius: 10px; padding: 8px 10px; font-size: 13px; margin-bottom: 10px; outline: none; }
+.task-search:focus { border-color: #1a1a1a; }
+.task-note { font-size: 12px; color: #666; margin-top: 4px; line-height: 1.35; background: #f8f7f3; border-radius: 8px; padding: 5px 7px; }
+.status-badge { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 999px; margin-left: 5px; }
+.status-not_started { background:#F1EFE8; color:#5F5E5A; }
+.status-in_progress { background:#E8F1FF; color:#245EAE; }
+.status-waiting { background:#FAEEDA; color:#854F0B; }
+.status-done { background:#E1F5EE; color:#0F6E56; }
+.modal textarea { width: 100%; min-height: 70px; resize: vertical; padding: 8px 10px; border: 1px solid #e0ddd5; border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; }
+.modal textarea:focus { border-color: #1a1a1a; }
+.briefing-preview { background:#F8FAFF; border:1px solid #DDEBFF; border-radius:12px; padding:10px 12px; font-size:13px; color:#333; margin:10px 0 8px; white-space:pre-line; }
+.briefing-preview-title { font-weight:700; color:#245EAE; margin-bottom:4px; }
+.mobile-bottom-nav { display:none; position:fixed; left:12px; right:12px; bottom:12px; z-index:190; background:#1a1a1a; border-radius:18px; padding:8px; box-shadow:0 8px 30px rgba(0,0,0,0.18); gap:6px; }
+.mobile-bottom-nav button { flex:1; background:transparent; color:white; border:none; border-radius:12px; padding:8px 4px; font-size:11px; cursor:pointer; }
+.mobile-bottom-nav button:hover { background:rgba(255,255,255,0.12); }
+.clean-complete-nudge { font-size:12px; color:#777; background:#f8f7f3; border-radius:10px; padding:8px 10px; margin-top:10px; display:none; }
+.move-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.move-row .action-btn { width:auto; margin-top:0; }
+
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-@media (max-width: 600px) { .dash { grid-template-columns: 1fr; } .tg-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .dash { grid-template-columns: 1fr; padding-bottom: 76px; } .tg-grid { grid-template-columns: 1fr; } .mobile-bottom-nav { display:flex; } }
 </style>
 </head>
 <body>
@@ -227,6 +247,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <option value="weekly">Weekly</option>
       <option value="monthly">Monthly</option>
     </select>
+    <label>Status</label>
+    <select id="task-status">
+      <option value="not_started" selected>Not started</option>
+      <option value="in_progress">In progress</option>
+      <option value="waiting">Waiting</option>
+      <option value="done">Done</option>
+    </select>
+    <label>Notes</label>
+    <textarea id="task-notes" placeholder="Add context, links, or reminders for this task"></textarea>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-save" onclick="saveTask()">Save</button>
@@ -241,7 +270,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="greeting" id="greeting">Hello, Mohammad 👋</div>
       <div class="subtext" id="datestr"></div>
     </div>
-    <div class="hero-note">Your day summary is below in Today Focus.</div>
+    <div class="hero-note">Your day summary is below in Start Here.</div>
     <div class="hidden-stats" aria-hidden="true">
       <span id="meet-count">—</span>
       <span id="task-count">0</span>
@@ -250,8 +279,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
-  <div class="card card-full">
-    <div class="section-label">🎯 Today Focus</div>
+  <div class="card card-full" id="start-here">
+    <div class="section-label">🎯 Start Here</div>
     <div class="focus-grid">
       <div class="focus-item"><div class="focus-num" id="focus-meetings">—</div><div class="focus-lbl">meetings today</div></div>
       <div class="focus-item"><div class="focus-num" id="focus-due-today">0</div><div class="focus-lbl">tasks due today</div></div>
@@ -262,13 +291,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 
   <div class="card card-full overdue-card" id="overdue-card" style="display:none;">
-    <div class="section-label">⚠️ Overdue Tasks</div>
+    <div class="section-label">⚠️ Overdue</div>
     <div id="overdue-list" class="overdue-list"></div>
+    <div class="move-row"><button class="action-btn btn-ghost" onclick="moveOverdueToTomorrow()">Move overdue to tomorrow</button></div>
   </div>
 
-  <div class="card card-full">
+  <div class="card card-full" id="calendar-card">
     <div class="calendar-toolbar">
-      <div class="section-label" style="margin-bottom:0;">📅 Calendar View</div>
+      <div class="section-label" style="margin-bottom:0;">📅 Calendar</div>
       <div class="calendar-nav">
         <button onclick="moveCalendar(-1)">‹ Previous</button>
         <button onclick="goToTodayCalendar()">Today</button>
@@ -288,20 +318,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="mobile-agenda" id="mobile-agenda"></div>
     <div class="week-legend">
-      <span>Blue = meetings · Tasks follow priority colours · v8.1 timeline</span>
+      <span>Blue = meetings · Tasks follow priority colours · v9 daily flow</span>
       <span id="week-range">—</span>
     </div>
   </div>
 
   <div class="card card-full">
-    <div class="section-label">🧭 Today Timeline & Smart Gaps</div>
+    <div class="section-label">🧭 Your Day & Good Time To Clear</div>
     <div class="timeline-grid">
       <div>
         <div style="font-size:13px;color:#666;margin-bottom:8px;">Your day in order, including meetings and tasks due today.</div>
         <div id="timeline-list" class="timeline-list"><div class="loading" style="padding:12px 0">Loading today’s timeline...</div></div>
       </div>
       <div>
-        <div style="font-size:13px;color:#666;margin-bottom:8px;">Suggestions for what to clear between meetings.</div>
+        <div style="font-size:13px;color:#666;margin-bottom:8px;">Suggestions for what you can clear between meetings.</div>
         <div id="gap-suggestions" class="gap-list"><div class="loading" style="padding:12px 0">Loading suggestions...</div></div>
       </div>
     </div>
@@ -314,32 +344,38 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="filter-btn" onclick="filterCal('google',this)">Google</button>
     </div>
     <div id="cal-list"><div class="loading">Fetching your calendar...</div></div>
+    <div class="briefing-preview" id="briefing-preview"><div class="briefing-preview-title">Briefing preview</div>Loading briefing preview...</div>
     <button class="action-btn btn-tg" onclick="sendBriefing()">📬 Send today's briefing to Telegram</button>
     <button class="action-btn btn-ghost" onclick="sendTodaySchedule()">📅 Send schedule now</button>
     <div class="tg-log" id="tg-log"></div>
   </div>
 
-  <div class="card">
-    <div class="section-label">Tasks</div>
+  <div class="card" id="tasks-card">
+    <div class="section-label">Task List</div>
+    <input class="task-search" id="task-search" type="search" placeholder="Search tasks or notes..." oninput="setTaskSearch(this.value)" />
     <div class="filter-row">
       <button class="filter-btn active" onclick="filterTasks('all',this)">All</button>
+      <button class="filter-btn" onclick="filterTasks('today',this)">Today</button>
+      <button class="filter-btn" onclick="filterTasks('tomorrow',this)">Tomorrow</button>
+      <button class="filter-btn" onclick="filterTasks('this_week',this)">This week</button>
+      <button class="filter-btn" onclick="filterTasks('no_deadline',this)">No deadline</button>
+      <button class="filter-btn" onclick="filterTasks('completed',this)">Completed</button>
       <button class="filter-btn" onclick="filterTasks('p1',this)">🔴 P1</button>
-      <button class="filter-btn" onclick="filterTasks('p2',this)">🟡 P2</button>
-      <button class="filter-btn" onclick="filterTasks('p3',this)">🟢 P3</button>
     </div>
     <div id="task-list"><div class="loading" style="padding:12px 0">No tasks yet — add one below!</div></div>
     <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
     <div style="font-size:12px;color:#aaa;margin-top:6px;" id="prog-lbl">0 of 0 done</div>
     <button class="action-btn btn-add" onclick="openModal()">+ Add task</button>
+    <button class="action-btn btn-ghost" onclick="moveUnfinishedTodayToTomorrow()">Move today's unfinished to tomorrow</button>
   </div>
 
   <div class="card">
-    <div class="section-label">📌 Upcoming Tasks</div>
+    <div class="section-label">📌 Upcoming Task List</div>
     <div id="upcoming-list" class="upcoming-list"><div class="loading" style="padding:12px 0">No upcoming tasks yet.</div></div>
   </div>
 
   <div class="card">
-    <div class="section-label">💾 Backup & Clean-up</div>
+    <div class="section-label">💾 Backup & Clean Up</div>
     <div style="font-size:13px;color:#666;margin-bottom:10px;">Export or import your task list so browser storage does not become your only copy.</div>
     <div class="backup-row">
       <button class="action-btn btn-ghost" onclick="exportTasks()">Export tasks</button>
@@ -348,6 +384,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importTasks(event)" />
     <div class="tg-log" id="backup-log"></div>
+    <div class="clean-complete-nudge" id="clean-complete-nudge"></div>
   </div>
 
   <div class="card card-full">
@@ -380,6 +417,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
+</div>
+
+
+<div class="mobile-bottom-nav">
+  <button onclick="scrollToSection('start-here')">Today</button>
+  <button onclick="scrollToSection('calendar-card')">Calendar</button>
+  <button onclick="scrollToSection('tasks-card')">Tasks</button>
+  <button onclick="openModal()">Add</button>
+  <button onclick="sendBriefing()">Telegram</button>
 </div>
 
 <script>
@@ -452,6 +498,7 @@ let remindedEvents = new Set();
 let tasks = [];
 let editingId = null;
 let currentFilter = 'all';
+let currentTaskSearch = '';
 
 // ── GREETING using local browser time ──
 (function() {
@@ -478,27 +525,36 @@ function saveTasks() {
 
 function renderTasks() {
   const list = document.getElementById('task-list');
-  const filtered = currentFilter === 'all' ? tasks : tasks.filter(t => t.priority === currentFilter);
+  const query = currentTaskSearch.trim().toLowerCase();
+  const filtered = tasks.filter(t => taskMatchesFilter(t, currentFilter)).filter(t => {
+    if (!query) return true;
+    return [t.name, t.notes, t.due, t.priority, t.status].join(' ').toLowerCase().includes(query);
+  });
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="loading" style="padding:12px 0">${tasks.length === 0 ? 'No tasks yet — add one below!' : 'No tasks in this priority.'}</div>`;
+    list.innerHTML = `<div class="loading" style="padding:12px 0">${tasks.length === 0 ? 'No tasks yet — add one below!' : 'No matching tasks.'}</div>`;
   } else {
-    list.innerHTML = filtered.map(t => `
+    list.innerHTML = filtered.map(t => {
+      const status = normalizeStatus(t);
+      return `
       <div class="task-item" data-id="${t.id}" data-p="${t.priority}">
         <div class="task-check${t.done ? ' done' : ''}" onclick="toggleTask('${t.id}')">${t.done ? '✓' : ''}</div>
         <div style="flex:1;min-width:0">
-          <div class="task-text${t.done ? ' done' : ''}">${escHtml(t.name)} <span class="p-badge ${t.priority}">${t.priority.toUpperCase()}</span></div>
+          <div class="task-text${t.done ? ' done' : ''}">${escHtml(t.name)} <span class="p-badge ${t.priority}">${t.priority.toUpperCase()}</span><span class="status-badge status-${status}">${statusLabel(status)}</span></div>
           <div style="font-size:12px;color:#aaa;margin-top:2px">${escHtml(formatDueForDisplay(t.due))}${t.repeat && t.repeat !== 'none' ? `<span class="repeat-label">↻ ${escHtml(t.repeat)}</span>` : ''}</div>
+          ${t.notes ? `<div class="task-note">${escHtml(t.notes)}</div>` : ''}
           ${!t.done ? `<div class="task-quick-row">
             <button class="mini-action" onclick="event.stopPropagation(); snoozeTask('${t.id}', 1)">Snooze tomorrow</button>
             <button class="mini-action" onclick="event.stopPropagation(); snoozeTask('${t.id}', 7)">Next week</button>
             <button class="mini-action" onclick="event.stopPropagation(); makePriority('${t.id}', 'p1')">Make P1</button>
+            <button class="mini-action" onclick="event.stopPropagation(); setTaskStatus('${t.id}', 'waiting')">Waiting</button>
           </div>` : ''}
         </div>
         <div class="task-actions">
           <button class="task-action-btn" onclick="openEditModal('${t.id}')" title="Edit">✏️</button>
           <button class="task-action-btn" onclick="deleteTask('${t.id}')" title="Delete">🗑️</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
   updateStats();
   renderOverdueTasks();
@@ -506,7 +562,38 @@ function renderTasks() {
   renderTodayFocus();
   renderTodayTimeline();
   renderGapSuggestions();
+  renderBriefingPreview();
+  updateCompletedNudge();
   refreshWeekCalendar();
+}
+
+function normalizeStatus(task) {
+  if (task.done) return 'done';
+  return ['not_started','in_progress','waiting','done'].includes(task.status) ? task.status : 'not_started';
+}
+
+function statusLabel(status) {
+  return ({ not_started: 'Not started', in_progress: 'In progress', waiting: 'Waiting', done: 'Done' })[status] || 'Not started';
+}
+
+function taskMatchesFilter(t, filter) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+  const weekEnd = new Date(today); weekEnd.setDate(today.getDate()+7);
+  const due = getTaskDueDate(t);
+  if (filter === 'all') return !t.done;
+  if (filter === 'completed') return !!t.done;
+  if (filter === 'today') return !t.done && due && isSameLocalDay(due, today);
+  if (filter === 'tomorrow') return !t.done && due && isSameLocalDay(due, tomorrow);
+  if (filter === 'this_week') return !t.done && due && due >= today && due <= weekEnd;
+  if (filter === 'no_deadline') return !t.done && !due;
+  if (['p1','p2','p3','p4'].includes(filter)) return !t.done && t.priority === filter;
+  return true;
+}
+
+function setTaskSearch(value) {
+  currentTaskSearch = value || '';
+  renderTasks();
 }
 
 function escHtml(str) {
@@ -610,6 +697,57 @@ function makePriority(id, priority) {
   saveTasks();
   renderTasks();
 }
+function setTaskStatus(id, status) {
+  const t = tasks.find(t => t.id === id);
+  if (!t) return;
+  t.status = status;
+  t.done = status === 'done';
+  saveTasks();
+  renderTasks();
+}
+
+function moveOverdueToTomorrow() {
+  const overdue = tasks.filter(isOverdueTask);
+  if (!overdue.length) return;
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const due = toDateInputValue(d);
+  overdue.forEach(t => { t.due = due; });
+  saveTasks();
+  renderTasks();
+  showBackupLog(`✅ Moved ${overdue.length} overdue task${overdue.length === 1 ? '' : 's'} to tomorrow.`);
+}
+
+function moveUnfinishedTodayToTomorrow() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(today); d.setDate(today.getDate() + 1);
+  const due = toDateInputValue(d);
+  const items = tasks.filter(t => !t.done && getTaskDueDate(t) && isSameLocalDay(getTaskDueDate(t), today));
+  if (!items.length) { showBackupLog('No unfinished tasks due today.'); return; }
+  items.forEach(t => { t.due = due; });
+  saveTasks();
+  renderTasks();
+  showBackupLog(`✅ Moved ${items.length} unfinished task${items.length === 1 ? '' : 's'} to tomorrow.`);
+}
+
+function updateCompletedNudge() {
+  const el = document.getElementById('clean-complete-nudge');
+  if (!el) return;
+  const completed = tasks.filter(t => t.done).length;
+  if (completed >= 10) {
+    el.style.display = 'block';
+    el.textContent = `You have ${completed} completed tasks. Consider clearing them to keep the dashboard light.`;
+  } else {
+    el.style.display = 'none';
+    el.textContent = '';
+  }
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 
 function updateStats() {
   const open = tasks.filter(t => !t.done).length;
@@ -624,7 +762,7 @@ function updateStats() {
 
 function toggleTask(id) {
   const t = tasks.find(t => t.id === id);
-  if (t) { t.done = !t.done; saveTasks(); renderTasks(); }
+  if (t) { t.done = !t.done; t.status = t.done ? 'done' : (t.status === 'done' ? 'not_started' : (t.status || 'not_started')); saveTasks(); renderTasks(); }
 }
 
 function deleteTask(id) {
@@ -741,7 +879,7 @@ function showBackupLog(msg) {
 }
 
 function exportTasks() {
-  const payload = { exportedAt: new Date().toISOString(), version: 'v7', tasks };
+  const payload = { exportedAt: new Date().toISOString(), version: 'v9', tasks };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -770,6 +908,8 @@ function importTasks(event) {
         due: t.due || 'No deadline',
         repeat: ['none','daily','weekly','monthly'].includes(t.repeat) ? t.repeat : 'none',
         done: !!t.done,
+        status: ['not_started','in_progress','waiting','done'].includes(t.status) ? t.status : (t.done ? 'done' : 'not_started'),
+        notes: t.notes || '',
         source: t.source || 'Imported'
       }));
       tasks = cleaned;
@@ -803,6 +943,8 @@ function openModal() {
   document.getElementById('task-priority').value = 'p3';
   document.getElementById('task-due').value = '';
   document.getElementById('task-repeat').value = 'none';
+  document.getElementById('task-status').value = 'not_started';
+  document.getElementById('task-notes').value = '';
   document.getElementById('modal').classList.add('open');
   setTimeout(() => document.getElementById('task-input').focus(), 50);
 }
@@ -816,6 +958,8 @@ function openEditModal(id) {
   document.getElementById('task-priority').value = t.priority;
   document.getElementById('task-due').value = toDateInputValue(getTaskDueDate(t));
   document.getElementById('task-repeat').value = t.repeat || 'none';
+  document.getElementById('task-status').value = normalizeStatus(t);
+  document.getElementById('task-notes').value = t.notes || '';
   document.getElementById('modal').classList.add('open');
   setTimeout(() => document.getElementById('task-input').focus(), 50);
 }
@@ -832,11 +976,13 @@ function saveTask() {
   const priority = document.getElementById('task-priority').value;
   const due = document.getElementById('task-due').value.trim() || 'No deadline';
   const repeat = document.getElementById('task-repeat').value || 'none';
+  const status = document.getElementById('task-status').value || 'not_started';
+  const notes = document.getElementById('task-notes').value.trim();
   if (editingId) {
     const t = tasks.find(t => t.id === editingId);
-    if (t) { t.name = name; t.priority = priority; t.due = due; t.repeat = repeat; }
+    if (t) { t.name = name; t.priority = priority; t.due = due; t.repeat = repeat; t.status = status; t.notes = notes; t.done = status === 'done'; }
   } else {
-    tasks.push({ id: Date.now().toString(), name, priority, due, repeat, done: false, source: 'Manual' });
+    tasks.push({ id: Date.now().toString(), name, priority, due, repeat, status, notes, done: status === 'done', source: 'Manual' });
   }
   saveTasks(); renderTasks(); refreshWeekCalendar(); closeModal();
 }
@@ -881,16 +1027,34 @@ function showLog(msg) {
   setTimeout(() => el.style.display = 'none', 3000);
 }
 
-async function sendBriefing() {
+function buildBriefingMessage() {
   const now = new Date();
   const h = now.getHours();
   const timeGreeting = h >= 5 && h < 12 ? 'Good morning' : h >= 12 && h < 17 ? 'Good afternoon' : 'Good evening';
   const dateStr = now.toLocaleDateString('en-SG', { weekday:'long', day:'numeric', month:'long' });
   const p1Tasks = tasks.filter(t => !t.done && t.priority === 'p1').map(t => `• ${t.name}`).join('\n');
+  const dueToday = getTaskOccurrencesForRange(new Date(new Date().setHours(0,0,0,0)), 1)
+    .filter(t => isSameLocalDay(t.dueDate, new Date()))
+    .map(t => `• ${t.name}`).join('\n');
+  const overdue = tasks.filter(isOverdueTask).map(t => `• ${t.name}`).join('\n');
   const eventLines = allEvents.length > 0
     ? allEvents.map(e => `• ${formatTime(e.start?.dateTime || e.start?.date)} — ${e.summary || 'Untitled'}`).join('\n')
     : '• No meetings today 🎉';
-  await sendTelegram(`${timeGreeting === 'Good morning' ? '🌅' : timeGreeting === 'Good afternoon' ? '☀️' : '🌙'} <b>${timeGreeting}, Mohammad!</b>\n📅 ${dateStr}\n\n<b>Today's meetings:</b>\n${eventLines}\n\n<b>🔴 Urgent tasks (P1):</b>\n${p1Tasks || '• All clear!'}\n\n<i>Stay focused. You've got this! 💪</i>`);
+  return `${timeGreeting === 'Good morning' ? '🌅' : timeGreeting === 'Good afternoon' ? '☀️' : '🌙'} <b>${timeGreeting}, Mohammad!</b>\n📅 ${dateStr}\n\n<b>Today's meetings:</b>\n${eventLines}\n\n<b>✅ Tasks due today:</b>\n${dueToday || '• None'}\n\n<b>⚠️ Overdue:</b>\n${overdue || '• None'}\n\n<b>🔴 Urgent tasks (P1):</b>\n${p1Tasks || '• All clear!'}\n\n<i>Stay focused. You've got this! 💪</i>`;
+}
+
+function renderBriefingPreview() {
+  const el = document.getElementById('briefing-preview');
+  if (!el) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dueToday = getTaskOccurrencesForRange(today, 1).filter(t => isSameLocalDay(t.dueDate, today)).length;
+  const overdueCount = tasks.filter(isOverdueTask).length;
+  const p1Count = tasks.filter(t => !t.done && t.priority === 'p1').length;
+  el.innerHTML = `<div class="briefing-preview-title">Briefing preview</div>${allEvents.length} meeting${allEvents.length === 1 ? '' : 's'} today · ${dueToday} task${dueToday === 1 ? '' : 's'} due · ${overdueCount} overdue · ${p1Count} P1`;
+}
+
+async function sendBriefing() {
+  await sendTelegram(buildBriefingMessage());
 }
 
 async function sendTodaySchedule() {
@@ -959,6 +1123,7 @@ async function loadCalendar() {
     renderTodayFocus();
     renderTodayTimeline();
     renderGapSuggestions();
+    renderBriefingPreview();
 
   } catch(err) {
     document.getElementById('cal-list').innerHTML = `<div style="font-size:12px;color:#e55;padding:8px;">Could not load calendar: ${err.message}</div>`;
@@ -969,6 +1134,7 @@ async function loadCalendar() {
     renderTodayFocus();
     renderTodayTimeline();
     renderGapSuggestions();
+    renderBriefingPreview();
   }
 }
 
@@ -1181,7 +1347,7 @@ function renderWeekCalendar(weekStart, events, taskItems, numDays = 7) {
         title: t.name,
         priority: t.priority || 'p3',
         timeLabel: t.repeat && t.repeat !== 'none' ? `Repeats ${t.repeat}` : 'Due task',
-        tag: t.priority ? t.priority.toUpperCase() : 'Task',
+        tag: `${t.priority ? t.priority.toUpperCase() : 'Task'} · ${statusLabel(normalizeStatus(t))}`,
         sortKey: 9999999999999 + priorityRank(t.priority)
       }));
 
@@ -1231,7 +1397,7 @@ function renderMobileAgenda(rangeStart, events, taskItems, numDays = 7) {
       .map(e => ({ type:'meeting', time: formatTime(e.start?.dateTime || e.start?.date), title: e.summary || 'Untitled', sortKey: getEventStartDate(e)?.getTime() || 0 }));
     const taskAgenda = (taskItems || [])
       .filter(t => isSameLocalDay(t.dueDate, d))
-      .map(t => ({ type:'task', id:t.id, time: `${(t.priority || 'p3').toUpperCase()} task due`, title: t.name, sortKey: 9999999999999 + priorityRank(t.priority) }));
+      .map(t => ({ type:'task', id:t.id, time: `${(t.priority || 'p3').toUpperCase()} · ${statusLabel(normalizeStatus(t))}`, title: t.name, sortKey: 9999999999999 + priorityRank(t.priority) }));
     const items = [...eventItems, ...taskAgenda].sort((a,b) => a.sortKey - b.sortKey);
     const body = items.length ? items.map(item => `
       <div class="agenda-item" ${item.type === 'task' ? `onclick="openEditModal('${item.id}')" style="cursor:pointer;"` : ''}>
