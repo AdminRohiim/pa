@@ -174,6 +174,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .calendar-nav { width: 100%; justify-content: flex-start; }
 }
 
+.task-quick-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+.mini-action { font-size: 10px; padding: 3px 7px; border-radius: 999px; border: 1px solid #e0ddd5; background: #fff; color: #666; cursor: pointer; }
+.mini-action:hover { background: #f5f4f0; color: #1a1a1a; }
+.timeline-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; }
+.timeline-list, .gap-list { display: grid; gap: 8px; }
+.timeline-item, .gap-item { border: 1px solid #eeeae2; border-radius: 10px; background: #fff; padding: 9px 10px; display: flex; gap: 10px; align-items: flex-start; }
+.timeline-time { min-width: 76px; font-size: 11px; font-weight: 700; color: #777; }
+.timeline-title { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+.timeline-meta { font-size: 11px; color: #999; margin-top: 2px; }
+.gap-item { background: #F8FAFF; border-color: #DDEBFF; }
+.gap-title { font-size: 13px; font-weight: 600; color: #245EAE; }
+.gap-meta { font-size: 12px; color: #666; margin-top: 2px; line-height: 1.35; }
+@media (max-width: 700px) {
+  .timeline-grid { grid-template-columns: 1fr; }
+}
+
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 @media (max-width: 600px) { .dash { grid-template-columns: 1fr; } .tg-grid { grid-template-columns: 1fr; } }
 </style>
@@ -272,8 +288,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="mobile-agenda" id="mobile-agenda"></div>
     <div class="week-legend">
-      <span>Blue = meetings · Tasks follow priority colours · v7.1 cleaner focus</span>
+      <span>Blue = meetings · Tasks follow priority colours · v8.1 timeline</span>
       <span id="week-range">—</span>
+    </div>
+  </div>
+
+  <div class="card card-full">
+    <div class="section-label">🧭 Today Timeline & Smart Gaps</div>
+    <div class="timeline-grid">
+      <div>
+        <div style="font-size:13px;color:#666;margin-bottom:8px;">Your day in order, including meetings and tasks due today.</div>
+        <div id="timeline-list" class="timeline-list"><div class="loading" style="padding:12px 0">Loading today’s timeline...</div></div>
+      </div>
+      <div>
+        <div style="font-size:13px;color:#666;margin-bottom:8px;">Suggestions for what to clear between meetings.</div>
+        <div id="gap-suggestions" class="gap-list"><div class="loading" style="padding:12px 0">Loading suggestions...</div></div>
+      </div>
     </div>
   </div>
 
@@ -458,6 +488,11 @@ function renderTasks() {
         <div style="flex:1;min-width:0">
           <div class="task-text${t.done ? ' done' : ''}">${escHtml(t.name)} <span class="p-badge ${t.priority}">${t.priority.toUpperCase()}</span></div>
           <div style="font-size:12px;color:#aaa;margin-top:2px">${escHtml(formatDueForDisplay(t.due))}${t.repeat && t.repeat !== 'none' ? `<span class="repeat-label">↻ ${escHtml(t.repeat)}</span>` : ''}</div>
+          ${!t.done ? `<div class="task-quick-row">
+            <button class="mini-action" onclick="event.stopPropagation(); snoozeTask('${t.id}', 1)">Snooze tomorrow</button>
+            <button class="mini-action" onclick="event.stopPropagation(); snoozeTask('${t.id}', 7)">Next week</button>
+            <button class="mini-action" onclick="event.stopPropagation(); makePriority('${t.id}', 'p1')">Make P1</button>
+          </div>` : ''}
         </div>
         <div class="task-actions">
           <button class="task-action-btn" onclick="openEditModal('${t.id}')" title="Edit">✏️</button>
@@ -469,6 +504,8 @@ function renderTasks() {
   renderOverdueTasks();
   renderUpcomingTasks();
   renderTodayFocus();
+  renderTodayTimeline();
+  renderGapSuggestions();
   refreshWeekCalendar();
 }
 
@@ -500,6 +537,78 @@ function setQuickDue(offsetDays) {
 
 function clearDueDate() {
   document.getElementById('task-due').value = '';
+}
+
+function dueLabelFromDate(date) {
+  return toDateInputValue(date);
+}
+
+function findQuickDuePhrase(raw) {
+  const s = raw.toLowerCase();
+  const monthNames = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+  const patterns = [
+    /\btoday\b/i,
+    /\btomorrow\b/i,
+    /\bthis week\b/i,
+    /\b(?:mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday)\b/i,
+    /\b\d{4}[\/-]\d{1,2}[\/-]\d{1,2}\b/,
+    /\b\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?\b/,
+    new RegExp('\\b\\d{1,2}(?:st|nd|rd|th)?(?:\\s+of)?\\s+(?:' + monthNames + ')(?:\\s+\\d{2,4})?\\b', 'i'),
+    new RegExp('\\b(?:' + monthNames + ')\\s+\\d{1,2}(?:st|nd|rd|th)?(?:\\s+\\d{2,4})?\\b', 'i')
+  ];
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match) return match[0];
+  }
+  return '';
+}
+
+function parseQuickTask(raw, forcedDue) {
+  let text = raw.trim();
+  let priority = 'p3';
+  const pMatch = text.match(/\b(p[1-4])\b/i);
+  if (pMatch) {
+    priority = pMatch[1].toLowerCase();
+    text = text.replace(pMatch[0], '').trim();
+  } else if (/\b(urgent|asap)\b/i.test(text)) {
+    priority = 'p1';
+    text = text.replace(/\b(urgent|asap)\b/ig, '').trim();
+  }
+
+  let due = 'No deadline';
+  if (forcedDue === 'today') {
+    due = toDateInputValue(new Date());
+  } else if (forcedDue === 'tomorrow') {
+    const d = new Date(); d.setDate(d.getDate() + 1); due = toDateInputValue(d);
+  } else {
+    const duePhrase = findQuickDuePhrase(text);
+    if (duePhrase) {
+      const parsed = getTaskDueDate({ due: duePhrase });
+      if (parsed) due = toDateInputValue(parsed);
+      text = text.replace(duePhrase, '').trim();
+    }
+  }
+
+  text = text.replace(/\s+/g, ' ').replace(/[,-]\s*$/, '').trim();
+  return { name: text || raw.trim(), priority, due };
+}
+
+function snoozeTask(id, days) {
+  const t = tasks.find(t => t.id === id);
+  if (!t) return;
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  t.due = toDateInputValue(d);
+  saveTasks();
+  renderTasks();
+}
+
+function makePriority(id, priority) {
+  const t = tasks.find(t => t.id === id);
+  if (!t) return;
+  t.priority = priority;
+  saveTasks();
+  renderTasks();
 }
 
 function updateStats() {
@@ -734,7 +843,6 @@ function saveTask() {
 
 document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('task-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveTask(); });
-
 function filterTasks(type, btn) {
   btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -849,6 +957,8 @@ async function loadCalendar() {
         }).join('');
 
     renderTodayFocus();
+    renderTodayTimeline();
+    renderGapSuggestions();
 
   } catch(err) {
     document.getElementById('cal-list').innerHTML = `<div style="font-size:12px;color:#e55;padding:8px;">Could not load calendar: ${err.message}</div>`;
@@ -857,6 +967,8 @@ async function loadCalendar() {
     document.getElementById('next-pill').style.display = 'none';
     document.getElementById('next-text').textContent = '';
     renderTodayFocus();
+    renderTodayTimeline();
+    renderGapSuggestions();
   }
 }
 
@@ -1145,6 +1257,96 @@ function changeCalendarDays(value) {
   // Keep the current view anchored on its start date so you can expand the range without jumping away.
   loadCalendar();
 }
+function getTodayTimelineItems() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const eventItems = allEvents.map(e => ({
+    type: 'meeting',
+    time: formatTime(e.start?.dateTime || e.start?.date),
+    title: e.summary || 'Untitled',
+    meta: e.location ? e.location.substring(0, 40) : 'Google Calendar',
+    sortKey: getEventStartDate(e)?.getTime() || 0
+  }));
+  const taskItems = getTaskOccurrencesForRange(today, 1)
+    .filter(t => isSameLocalDay(t.dueDate, today))
+    .map(t => ({
+      type: 'task',
+      id: t.id,
+      time: 'Due task',
+      title: t.name,
+      meta: (t.priority || 'p3').toUpperCase(),
+      sortKey: 9999999999999 + priorityRank(t.priority)
+    }));
+  return [...eventItems, ...taskItems].sort((a,b) => a.sortKey - b.sortKey);
+}
+
+function renderTodayTimeline() {
+  const list = document.getElementById('timeline-list');
+  if (!list) return;
+  const items = getTodayTimelineItems();
+  if (!items.length) {
+    list.innerHTML = '<div class="loading" style="padding:12px 0">No meetings or due tasks today.</div>';
+    return;
+  }
+  list.innerHTML = items.map(item => `
+    <div class="timeline-item" ${item.type === 'task' ? `onclick="openEditModal('${item.id}')" style="cursor:pointer;"` : ''}>
+      <div class="timeline-time">${escHtml(item.time)}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="timeline-title">${item.type === 'meeting' ? '🔵' : '✅'} ${escHtml(item.title)}</div>
+        <div class="timeline-meta">${escHtml(item.meta || '')}${item.type === 'task' ? ' · click to edit' : ''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function getSuggestedTaskForGap() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dueToday = getTaskOccurrencesForRange(today, 1).filter(t => isSameLocalDay(t.dueDate, today));
+  const openP1 = tasks.filter(t => !t.done && t.priority === 'p1');
+  const pool = [...dueToday, ...openP1]
+    .filter((t, idx, arr) => arr.findIndex(x => x.id === t.id) === idx)
+    .sort((a,b) => priorityRank(a.priority) - priorityRank(b.priority));
+  return pool[0] || tasks.filter(t => !t.done).sort((a,b) => priorityRank(a.priority) - priorityRank(b.priority))[0] || null;
+}
+
+function renderGapSuggestions() {
+  const box = document.getElementById('gap-suggestions');
+  if (!box) return;
+  const now = new Date();
+  const timedEvents = allEvents
+    .filter(e => e.start?.dateTime)
+    .map(e => ({ start: new Date(e.start.dateTime), end: e.end?.dateTime ? new Date(e.end.dateTime) : new Date(new Date(e.start.dateTime).getTime() + 30*60000), title: e.summary || 'Untitled' }))
+    .filter(e => e.end > now)
+    .sort((a,b) => a.start - b.start);
+
+  const suggestions = [];
+  const suggestedTask = getSuggestedTaskForGap();
+
+  if (!timedEvents.length) {
+    if (suggestedTask) suggestions.push({ title: 'Open focus window', meta: `No more meetings today. Good time to clear: ${suggestedTask.name}` });
+    else suggestions.push({ title: 'Open focus window', meta: 'No meetings and no urgent tasks showing. Good time for admin or planning.' });
+  } else {
+    const first = timedEvents[0];
+    const mins = Math.round((first.start - now) / 60000);
+    if (mins >= 25) {
+      suggestions.push({ title: `${mins} min before next meeting`, meta: suggestedTask ? `Good slot to clear: ${suggestedTask.name}` : 'Good slot to clear a small admin item.' });
+    }
+    for (let i = 0; i < timedEvents.length - 1; i++) {
+      const gap = Math.round((timedEvents[i+1].start - timedEvents[i].end) / 60000);
+      if (gap >= 30) suggestions.push({ title: `${gap} min gap after ${timedEvents[i].title}`, meta: suggestedTask ? `Suggested task: ${suggestedTask.name}` : 'Use this for a focused work block.' });
+      if (suggestions.length >= 3) break;
+    }
+  }
+
+  box.innerHTML = suggestions.map(s => `
+    <div class="gap-item">
+      <div style="font-size:16px;">✨</div>
+      <div>
+        <div class="gap-title">${escHtml(s.title)}</div>
+        <div class="gap-meta">${escHtml(s.meta)}</div>
+      </div>
+    </div>`).join('');
+}
+
 function filterCal(type, btn) {
   document.querySelectorAll('.filter-row')[0].querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
