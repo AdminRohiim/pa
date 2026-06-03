@@ -210,6 +210,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .voice-help { font-size:13px; color:#666; line-height:1.45; }
 .voice-log { font-size:12px; color:#555; margin-top:8px; padding:8px 10px; background:#f5f4f0; border-radius:8px; display:none; }
 .voice-pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:3px 8px; border-radius:999px; background:#F2EAFE; color:#5B3DB3; margin-left:6px; }
+.voice-banner { background: #F0EAFF; border: 0.5px solid #D8B4FE; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6B21A8; }
+.voice-banner-count { font-weight: 600; }
 @media (max-width: 600px) { .voice-setup-grid { grid-template-columns: 1fr; } }
 
 .mobile-bottom-nav { display:none; position:fixed; left:12px; right:12px; bottom:12px; z-index:190; background:#1a1a1a; border-radius:18px; padding:8px; box-shadow:0 8px 30px rgba(0,0,0,0.18); gap:6px; }
@@ -327,7 +329,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="mobile-agenda" id="mobile-agenda"></div>
     <div class="week-legend">
-      <span>Blue = meetings · Tasks follow priority colours · v11.2 voice debug</span>
+      <span>Blue = meetings · Tasks follow priority colours · v11 voice sync</span>
       <span id="week-range">—</span>
     </div>
   </div>
@@ -400,23 +402,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <div class="card card-full" id="voice-task-section">
     <div class="section-label">🎙️ Telegram Voice Tasks</div>
-    <div class="voice-help">
-      Send a voice note to your Telegram bot, then click Sync. First save your backend base URL and sync secret below. Example voice note: <b>"Add task submit mock-up by 5 June P1"</b>.
+    <div id="voice-banner" style="display:none;" class="voice-banner">
+      🎙️ <span><span class="voice-banner-count" id="voice-banner-count">0</span> new voice task(s) added from Telegram!</span>
     </div>
-    <div class="voice-setup-grid">
-      <div>
-        <label>Voice backend URL</label>
-        <input type="text" id="voice-backend-url" placeholder="https://your-voice-backend.vercel.app" />
-      </div>
-      <div>
-        <label>Sync secret</label>
-        <input type="password" id="voice-sync-secret" placeholder="Same TASK_SYNC_SECRET from backend" />
-      </div>
+    <div class="voice-help">
+      Send a voice note to <b>@PA_Rohiim_bot</b> on Telegram and it will automatically appear here within 30 seconds. Try saying: <b>"Add a task to review the Q3 report by Friday, urgent"</b>.
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-      <button class="action-btn btn-ghost" style="width:auto;margin:0;" onclick="saveVoiceSettings()">💾 Save voice settings</button>
-      <button class="action-btn btn-ghost" style="width:auto;margin:0;" onclick="testVoiceBackend()">🧪 Test backend</button>
-      <button class="action-btn btn-tg" style="width:auto;margin:0;" onclick="syncVoiceTasks()">🎙️ Sync voice tasks</button>
+      <button class="action-btn btn-tg" style="width:auto;margin:0;" onclick="pollVoiceTasks()">🔄 Sync now</button>
     </div>
     <div class="voice-log" id="voice-log"></div>
   </div>
@@ -469,7 +462,6 @@ const TG_CHAT = '605659794';
 const STORAGE_KEY = 'pa_tasks_v1';
 const TOKEN_KEY = 'pa_google_tokens';
 const MEM_KEY = 'pa_memory_v1';
-const VOICE_SETTINGS_KEY = 'pa_voice_settings_v1';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly';
 const REDIRECT_URI = 'https://adminrohiim.github.io/pa/';
 
@@ -1568,12 +1560,13 @@ function checkReminders() {
 }
 
 loadTasks();
-initVoiceSettings();
 loadCalendar();
 initMemory();
+pollVoiceTasks();
 setInterval(checkReminders, 60000);
 setInterval(loadCalendar, 300000);
-setInterval(checkWeeklyReview, 60000 * 30); // check every 30 min
+setInterval(checkWeeklyReview, 60000 * 30);
+setInterval(pollVoiceTasks, 30000);
 
 // ── MEMORY SYSTEM ──
 
@@ -1745,25 +1738,8 @@ function checkWeeklyReview() {
 }
 
 
-// ── TELEGRAM VOICE TASK SYNC ──
-function loadVoiceSettings() {
-  try { return JSON.parse(localStorage.getItem(VOICE_SETTINGS_KEY)) || {}; } catch { return {}; }
-}
-
-function saveVoiceSettings() {
-  const backendUrl = document.getElementById('voice-backend-url').value.trim().replace(/\/$/, '');
-  const syncSecret = document.getElementById('voice-sync-secret').value.trim();
-  localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify({ backendUrl, syncSecret }));
-  showVoiceLog('✅ Voice settings saved.');
-}
-
-function initVoiceSettings() {
-  const s = loadVoiceSettings();
-  const urlEl = document.getElementById('voice-backend-url');
-  const secretEl = document.getElementById('voice-sync-secret');
-  if (urlEl) urlEl.value = s.backendUrl || '';
-  if (secretEl) secretEl.value = s.syncSecret || '';
-}
+// ── TELEGRAM VOICE TASK SYNC (auto-polls Render backend) ──
+const RENDER_BACKEND = 'https://email-scanner-yar2.onrender.com';
 
 function showVoiceLog(msg, isError=false) {
   const el = document.getElementById('voice-log');
@@ -1771,24 +1747,7 @@ function showVoiceLog(msg, isError=false) {
   el.style.display = 'block';
   el.style.color = isError ? '#c33' : '#555';
   el.textContent = msg;
-  // Keep voice logs visible for troubleshooting.
-}
-
-async function testVoiceBackend() {
-  const settings = loadVoiceSettings();
-  if (!settings.backendUrl) {
-    showVoiceLog('Add and save your backend URL first.', true);
-    return;
-  }
-  showVoiceLog('Testing backend connection...');
-  try {
-    const res = await fetch(`${settings.backendUrl.replace(/\/$/, '')}/`);
-    const text = await res.text();
-    if (!res.ok) throw new Error(`Backend returned ${res.status}: ${text.slice(0, 160)}`);
-    showVoiceLog('✅ Backend is reachable: ' + text.slice(0, 180));
-  } catch (err) {
-    showVoiceLog('❌ Backend test failed: ' + err.message, true);
-  }
+  setTimeout(() => { el.style.display = 'none'; }, 6000);
 }
 
 function normaliseVoiceTask(item) {
@@ -1808,36 +1767,44 @@ function normaliseVoiceTask(item) {
   };
 }
 
-async function syncVoiceTasks() {
-  const settings = loadVoiceSettings();
-  if (!settings.backendUrl || !settings.syncSecret) {
-    showVoiceLog('Add and save your backend URL and sync secret first.', true);
-    return;
-  }
-
-  showVoiceLog('Checking Telegram voice tasks...');
+async function pollVoiceTasks() {
+  showVoiceLog('Checking for new voice tasks...');
   try {
-    const url = `${settings.backendUrl.replace(/\/$/, '')}/api/tasks?secret=${encodeURIComponent(settings.syncSecret)}&consume=1`;
-    const res = await fetch(url);
-    const rawText = await res.text();
-    let data;
-    try { data = JSON.parse(rawText); } catch { throw new Error(`Backend did not return JSON. Status ${res.status}: ${rawText.slice(0, 180)}`); }
-    if (!res.ok) throw new Error(data.error || `Sync failed with status ${res.status}`);
-
-    const incoming = Array.isArray(data.tasks) ? data.tasks : [];
-    if (!incoming.length) {
-      showVoiceLog('No new voice tasks found.');
-      return;
-    }
+    const res = await fetch(`${RENDER_BACKEND}/voice-tasks`);
+    if (!res.ok) throw new Error('Backend returned ' + res.status);
+    const data = await res.json();
+    const voiceTasks = Array.isArray(data.tasks) ? data.tasks : Array.isArray(data) ? data : [];
 
     const existingIds = new Set(tasks.map(t => t.id));
-    const newTasks = incoming.map(normaliseVoiceTask).filter(t => !existingIds.has(t.id));
-    tasks.push(...newTasks);
-    saveTasks();
-    renderTasks();
-    showVoiceLog(`✅ Added ${newTasks.length} voice task${newTasks.length === 1 ? '' : 's'} to your dashboard.`);
+    const newTasks = voiceTasks.filter(vt => !existingIds.has(vt.id) && !vt.done).map(normaliseVoiceTask);
+
+    if (newTasks.length > 0) {
+      tasks.push(...newTasks);
+      saveTasks(); renderTasks();
+      document.getElementById('voice-banner-count').textContent = newTasks.length;
+      const banner = document.getElementById('voice-banner');
+      banner.style.display = 'flex';
+      setTimeout(() => banner.style.display = 'none', 8000);
+      showVoiceLog(`✅ Added ${newTasks.length} voice task${newTasks.length === 1 ? '' : 's'}.`);
+    } else {
+      showVoiceLog('No new voice tasks.');
+    }
+
+    // Sync done state back to Redis
+    const updatedVoice = voiceTasks.map(vt => {
+      const local = tasks.find(t => t.id === vt.id);
+      return local ? { ...vt, done: local.done } : vt;
+    });
+    const anyChanged = updatedVoice.some((vt, i) => vt.done !== (voiceTasks[i]?.done));
+    if (anyChanged) {
+      fetch(`${RENDER_BACKEND}/voice-tasks/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks: updatedVoice })
+      }).catch(() => {});
+    }
   } catch (err) {
-    showVoiceLog('❌ Voice sync failed: ' + err.message, true);
+    showVoiceLog('Voice sync failed: ' + err.message, true);
   }
 }
 
