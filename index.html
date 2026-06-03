@@ -1773,7 +1773,7 @@ async function pollVoiceTasks() {
     const res = await fetch(`${RENDER_BACKEND}/voice-tasks`);
     if (!res.ok) throw new Error('Backend returned ' + res.status);
     const data = await res.json();
-    const voiceTasks = data.tasks || [];
+    const voiceTasks = Array.isArray(data.tasks) ? data.tasks : Array.isArray(data) ? data : [];
 
     const existingIds = new Set(tasks.map(t => t.id));
     const newTasks = voiceTasks.filter(vt => !existingIds.has(vt.id) && !vt.done).map(normaliseVoiceTask);
